@@ -238,7 +238,7 @@ def adapt_epoch(data_name, set_name):
             cur_loss = total_loss / n_words
             elapsed = time.time() - start_time
             logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
-                        'loss {:5.2f} | ppl {:8.2f} |'.format(
+                         'loss {:5.2f} | ppl {:8.2f} |'.format(
                 epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
                 elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
             total_loss = 0
@@ -259,8 +259,8 @@ if __name__ == '__main__':
             run_epoch(train_iterator)
             train_iterator = get_iterator('train', ('zh', 'en'))
             run_epoch(train_iterator)
-            adapt_epoch('cs', 'adapt')
-            adapt_epoch('cs', 'cs')
+            # adapt_epoch('cs', 'adapt')
+            # adapt_epoch('cs', 'cs')
             valid_iterator = get_iterator('cs', 'test')
             val_loss = evaluate(valid_iterator)
             logger.info('-' * 89)
