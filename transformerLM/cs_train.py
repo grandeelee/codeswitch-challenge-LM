@@ -204,6 +204,10 @@ if __name__ == '__main__':
                 logger.info('Saving model (new best validation)')
                 stored_loss = val_loss
 
+            if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
+                logger.info('Early stop')
+                break
+
             best_val_loss.append(val_loss)
 
     except KeyboardInterrupt:
