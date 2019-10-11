@@ -11,7 +11,7 @@ def get_args():
     # model
     parser.add_argument('--pos_embed', type=bool, default=False, help='whether use position embedding')
     parser.add_argument('--emsize', type=int, default=384, help='size of word embeddings')
-    parser.add_argument('--n_ctx', type=int, default=50, help='sequence length')
+    parser.add_argument('--n_ctx', type=int, default=35, help='sequence length')
     parser.add_argument('--n_heads', type=int, default=12)
     parser.add_argument('--nlayers', type=int, default=12, help='number of layers')
     parser.add_argument('--tied', action='store_true', help='tie the word embedding and softmax weights')
@@ -48,6 +48,6 @@ def get_args():
     # dataset
     parser.add_argument('--max_vocab', type=int, default=50000)
     parser.add_argument('--min_count', type=int, default=0)
-    parser.add_argument('--max_len', type=int, default=48)
+    parser.add_argument('--max_len', type=int, default=33)
 
     return parser.parse_args()
