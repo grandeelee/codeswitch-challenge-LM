@@ -219,7 +219,7 @@ class LMModel(nn.Module):
 		self.return_probs = return_probs
 		if self.return_probs:
 			pos_emb_mask = torch.zeros(1, 1, vocab)
-			pos_emb_mask[:, :, -n_ctx:] = -1e12
+			pos_emb_mask[:, :, 3:14] = -1e12
 			self.register_buffer('pos_emb_mask', pos_emb_mask)
 
 	def forward(self, x):

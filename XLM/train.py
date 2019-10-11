@@ -246,6 +246,11 @@ def adapt_epoch(data_name, set_name):
             start_time = time.time()
         batch += 1
 
+def generate(args, n_words, temperature, model):
+    model.eval()
+
+
+
 
 if __name__ == '__main__':
     best_val_loss = []
@@ -286,6 +291,7 @@ if __name__ == '__main__':
 
     # Load the best saved model.
     model.load_state_dict(torch.load(args.model + '.pt'))
+    generate(args, 1000, 1e-3, model)
 
     # Run on test data.
     test_iterator = get_iterator('cs', 'test')
