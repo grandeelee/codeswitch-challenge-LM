@@ -46,8 +46,8 @@ def get_args():
     parser.add_argument('--optimizer', type=str, default='adam', help='optimizer to use (sgd, adam)')
 
     # dataset
-    parser.add_argument('--max_vocab', type=int, default=-1)
-    parser.add_argument('--min_count', type=int, default=5)
+    parser.add_argument('--max_vocab', type=int, default=50000)
+    parser.add_argument('--min_count', type=int, default=0)
     parser.add_argument('--max_len', type=int, default=48)
 
     return parser.parse_args()
