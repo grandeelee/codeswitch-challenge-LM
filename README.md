@@ -31,10 +31,13 @@ Analysis:
 + Visualize attention weights (may not be helpful)
 
 TO-DO:
-+ finalize the vocab.count. 
-+ train zero-shot model (without adapt and real cs) to over-fit, about 9 epochs, separately save the best model for testing.
-+ train with adapt for both baseline and CSLM.
-+ train baseline again, fixed 50k vocab, previous run vocab=55k.
++ finalize the vocab.count. OK
++ train zero-shot model (without adapt and real cs) to over-fit, about 9 epochs, separately save the best model for testing. OK
++ train with adapt for both baseline and CSLM. left baseline adapt and zero-shot
++ train baseline again, fixed 50k vocab, previous run vocab=55k. OK
++ perform split ppl test
++ extract embedding
++ extract attention weights and plot
 
 Important Model parameters:
 ```
