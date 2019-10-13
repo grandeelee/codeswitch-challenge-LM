@@ -31,9 +31,10 @@ Analysis:
 + Visualize attention weights (may not be helpful)
 
 TO-DO:
-+ train baseline again, fixed 50k vocab, previous run vocab=55k
-+ train zero-shot model (without adapt and real cs) to over-fit, about 9 epochs
-+ train 
++ finalize the vocab.count. 
++ train zero-shot model (without adapt and real cs) to over-fit, about 9 epochs, separately save the best model for testing.
++ train with adapt for both baseline and CSLM.
++ train baseline again, fixed 50k vocab, previous run vocab=55k.
 
 Important Model parameters:
 ```
