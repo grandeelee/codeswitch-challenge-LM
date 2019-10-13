@@ -193,13 +193,10 @@ def run_epoch(train_gen):
                          'loss {:5.2f} | ppl {:8.2f} |'.format(
                 epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
                 elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
-            return_loss = math.exp(cur_loss)
             total_loss = 0
             n_words = 0
             start_time = time.time()
         batch += 1
-
-    return return_loss
 
 
 def adapt_epoch(data_name, set_name):
@@ -259,10 +256,10 @@ if __name__ == '__main__':
         for epoch in range(args.epochs):
             epoch_start_time = time.time()
             train_iterator = get_iterator('train', ('en', 'zh'))
-            zhppl = run_epoch(train_iterator)
+            run_epoch(train_iterator)
             train_iterator = get_iterator('train', ('zh', 'en'))
-            enppl = run_epoch(train_iterator)
-            # adapt_epoch('cs', 'adapt')
+            run_epoch(train_iterator)
+            adapt_epoch('cs', 'adapt')
             # adapt_epoch('cs', 'cs')
             valid_iterator = get_iterator('cs', 'test')
             val_loss = evaluate(valid_iterator)
@@ -272,7 +269,6 @@ if __name__ == '__main__':
                 epoch + 1, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
             logger.info('-' * 89)
 
-            val_loss = (zhppl + enppl) / 2
             if val_loss < stored_loss:
                 torch.save(model.state_dict(), args.model + '.pt')
                 logger.info('Saving model (new best validation)')

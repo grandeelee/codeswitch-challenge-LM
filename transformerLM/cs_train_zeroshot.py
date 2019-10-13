@@ -6,11 +6,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-from options import get_args
+from cs_options import get_args
 from logger import create_logger
 from transformer import LMModel
 from opt import OpenAIAdam
-from my_loader import check_data_params, load_data
+from cs_loader import check_data_params, load_data
 
 args = get_args()
 
@@ -33,15 +33,18 @@ args.batch_size = args.batch_size * max(n_gpu, 1)
 check_data_params(args)
 # load data
 data = load_data(args)
-args.log_interval = (len(data['train'][('en', 'zh')]) // args.batch_size) // 10
+args.log_interval = (len(data['cs']['train']) // args.batch_size) // 10
 args.vocab_size = len(data['dictionary'])
-assert args.max_len + 2 <= args.n_ctx, 'sequence length cannot accommodate max sent length'
+assert args.max_len <= args.n_ctx, 'sequence length cannot accommodate max sent length'
 
 logger.info('------------------------------------------------')
 for key, value in vars(args).items():
     logger.info('{} : {}'.format(key, value))
 logger.info('------------------------------------------------')
 
+# iterators[('penn', 'train')]
+# iterators[('penn', 'valid')]
+# iterators[('penn', 'test')]
 iterators = {}
 
 
@@ -83,7 +86,7 @@ def get_batch(iter_name, data_set):
 model = LMModel(args, args.vocab_size, args.n_ctx)
 criterion = nn.CrossEntropyLoss(reduction='none')
 
-n_updates_total = (len(data['train'][('en', 'zh')]) * 2 // args.batch_size) * args.epochs
+n_updates_total = (len(data['cs']['train']) // args.batch_size) * args.epochs
 model_opt = OpenAIAdam(model.parameters(),
                        lr=args.lr,
                        schedule=args.lr_schedule,
@@ -99,9 +102,8 @@ model_opt = OpenAIAdam(model.parameters(),
 logger.info("Model: {}".format(model))
 logger.info("Number of parameters (model): %i" % sum([p.numel() for p in model.parameters() if p.requires_grad]))
 
+
 model.to(device)
-
-
 # model = nn.DataParallel(model)
 
 
@@ -130,86 +132,14 @@ def evaluate(generator):
     return total_loss / n_words
 
 
-def concat_batches(x1, len1, x2, len2, pad_idx, eos_idx):
-    """
-    Concat batches with different languages.
-    """
-    lengths = len1 + len2
-    slen, bs = lengths.max().item(), lengths.size(0)
-
-    x = x1.new(bs, slen).fill_(pad_idx)
-    x[:, :len1.max().item()].copy_(x1)
-
-    for i in range(bs):
-        l1 = len1[i]
-        x[i, l1:l1 + len2[i]].copy_(x2[i, :len2[i]])
-
-    assert (x == eos_idx).long().sum().item() == 2 * bs
-
-    return x, lengths
-
-
-def run_epoch(train_gen):
-    total_loss = 0
-    start_time = time.time()
-    batch = 0
-    n_words = 0
-    epoch_size = (len(data['train'][('en', 'zh')]) // args.batch_size)
-    # for _ in range(10):
-    for x, lengths in tqdm(train_gen, total=epoch_size, ncols=100):
-        # generate batch
-        # x, lengths = next(train_gen)
-        # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
-        alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
-        # -1 minus away the bos index, target is the sent and </s>
-        pred_mask = alen[None] < lengths[:, None] - 1
-        # if params.context_size > 0:  # do not predict without context
-        #     pred_mask[:params.context_size] = 0
-        # select target to be first word until eos
-        y = x[:, 1:].masked_select(pred_mask[:, :-1])
-        assert pred_mask.sum().item() == y.size(0)
-
-        x = x.to(device)
-        pred_mask = pred_mask.to(device)
-        y = y.to(device)
-
-        # forward / loss
-        model.train()
-        model_opt.zero_grad()
-        lm_logits = model(x)
-        lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
-
-        lm_losses = criterion(lm_logits, y)
-        lm_losses = lm_losses.sum() / torch.sum(pred_mask)
-        n_words += torch.sum(pred_mask)
-        lm_losses.backward()
-        model_opt.step()
-        total_loss += lm_losses.data * torch.sum(pred_mask)
-
-        if batch % args.log_interval == 0 and batch > 0:
-            cur_loss = total_loss / n_words
-            elapsed = time.time() - start_time
-            logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
-                         'loss {:5.2f} | ppl {:8.2f} |'.format(
-                epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
-                elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
-            return_loss = math.exp(cur_loss)
-            total_loss = 0
-            n_words = 0
-            start_time = time.time()
-        batch += 1
-
-    return return_loss
-
-
-def adapt_epoch(data_name, set_name):
+def run_epoch(data_name, set_name):
     total_loss = 0
     start_time = time.time()
     batch = 0
     n_words = 0
     epoch_size = (len(data[data_name][set_name]) // args.batch_size)
-    adapt_iterator = get_iterator(data_name, set_name)
-    for x, lengths in tqdm(adapt_iterator, total=epoch_size, ncols=30):
+    train_iterator = get_iterator(data_name, set_name)
+    for x, lengths in tqdm(train_iterator, total=epoch_size, ncols=30):
         # generate batch
         # x, lengths = get_batch('penn', 'train')
         alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
@@ -241,8 +171,8 @@ def adapt_epoch(data_name, set_name):
             cur_loss = total_loss / n_words
             elapsed = time.time() - start_time
             logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
-                         'loss {:5.2f} | ppl {:8.2f} |'.format(
-                epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
+                        'loss {:5.2f} | ppl {:8.2f} |'.format(
+                epoch, batch, epoch_size, model_opt.param_groups[0]['lr'],
                 elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
             total_loss = 0
             n_words = 0
@@ -258,21 +188,17 @@ if __name__ == '__main__':
     try:
         for epoch in range(args.epochs):
             epoch_start_time = time.time()
-            train_iterator = get_iterator('train', ('en', 'zh'))
-            zhppl = run_epoch(train_iterator)
-            train_iterator = get_iterator('train', ('zh', 'en'))
-            enppl = run_epoch(train_iterator)
-            # adapt_epoch('cs', 'adapt')
-            # adapt_epoch('cs', 'cs')
+            run_epoch('cs', 'train')
+            # run_epoch('cs', 'adapt')
+            # run_epoch('cs', 'cs')
             valid_iterator = get_iterator('cs', 'test')
             val_loss = evaluate(valid_iterator)
             logger.info('-' * 89)
             logger.info('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
-                        'valid_en ppl {:8.2f} |'.format(
-                epoch + 1, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
+                        'valid ppl {:8.2f} |'.format(
+                epoch, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
             logger.info('-' * 89)
 
-            val_loss = (zhppl + enppl) / 2
             if val_loss < stored_loss:
                 torch.save(model.state_dict(), args.model + '.pt')
                 logger.info('Saving model (new best validation)')
