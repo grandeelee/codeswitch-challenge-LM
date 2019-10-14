@@ -23,9 +23,9 @@ from my_dictionary import Dictionary
 
 if __name__ == '__main__':
 
-    logger = create_logger('../save/cs_vocab.log')
+    logger = create_logger('../save/cs_new_split.log')
     # list all datasets in the data/ directory
-    data_path = '../data/cs/'
+    data_path = '../data/cs_big/'
     files = []
     for file in os.listdir(data_path):
         p = os.path.join(data_path, file)

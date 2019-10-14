@@ -189,9 +189,8 @@ if __name__ == '__main__':
         for epoch in range(args.epochs):
             epoch_start_time = time.time()
             run_epoch('cs', 'train')
-            run_epoch('cs', 'adapt')
-            run_epoch('cs', 'cs')
-            valid_iterator = get_iterator('cs', 'test')
+            # run_epoch('cs', 'adapt')
+            valid_iterator = get_iterator('cs', 'valid')
             val_loss = evaluate(valid_iterator)
             logger.info('-' * 89)
             logger.info('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
@@ -209,6 +208,54 @@ if __name__ == '__main__':
                 break
 
             best_val_loss.append(val_loss)
+        # adaptation
+        for epoch in range(args.epochs):
+            epoch_start_time = time.time()
+            # run_epoch('cs', 'train')
+            run_epoch('cs', 'adapt')
+            valid_iterator = get_iterator('cs', 'valid')
+            val_loss = evaluate(valid_iterator)
+            logger.info('-' * 89)
+            logger.info('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
+                        'valid ppl {:8.2f} |'.format(
+                epoch, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
+            logger.info('-' * 89)
+
+            if val_loss < stored_loss:
+                torch.save(model.state_dict(), args.model + '_adapt.pt')
+                logger.info('Saving model (new best validation)')
+                stored_loss = val_loss
+            # Run on test data.
+            test_iterator = get_iterator('cs', 'test')
+            test_loss = evaluate(test_iterator)
+            logger.debug('=' * 89)
+            logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+                test_loss, math.exp(test_loss)))
+            logger.debug('=' * 89)
+            # Run on test data.
+            test_iterator = get_iterator('cs', 'test_cs')
+            test_loss = evaluate(test_iterator)
+            logger.debug('=' * 89)
+            logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+                test_loss, math.exp(test_loss)))
+            logger.debug('=' * 89)
+            # Run on test data.
+            test_iterator = get_iterator('cs', 'test_en')
+            test_loss = evaluate(test_iterator)
+            logger.debug('=' * 89)
+            logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+                test_loss, math.exp(test_loss)))
+            logger.debug('=' * 89)
+            # Run on test data.
+            test_iterator = get_iterator('cs', 'test_zh')
+            test_loss = evaluate(test_iterator)
+            logger.debug('=' * 89)
+            logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+                test_loss, math.exp(test_loss)))
+            logger.debug('=' * 89)
+            if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
+                logger.info('Early stop')
+                break
 
     except KeyboardInterrupt:
         logger.info('-' * 89)

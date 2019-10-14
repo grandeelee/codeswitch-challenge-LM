@@ -5,8 +5,8 @@ import time
 def get_args():
     parser = argparse.ArgumentParser(description='Transformer based Language Model')
     # directory
-    parser.add_argument('--data', type=str, default='../data/cs/', help='location of the data corpus')
-    parser.add_argument('--model', type=str, default='../save/cs_baseline', help='location of the model')
+    parser.add_argument('--data', type=str, default='../data/cs_big/', help='location of the data corpus')
+    parser.add_argument('--model', type=str, default='../save/cs_big_baseline', help='location of the model')
 
     # model
     parser.add_argument('--pos_embed', type=bool, default=False, help='whether use position embedding')

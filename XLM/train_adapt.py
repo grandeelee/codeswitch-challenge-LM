@@ -10,7 +10,7 @@ from options import get_args
 from logger import create_logger
 from transformer import LMModel
 from opt import OpenAIAdam
-from my_loader import check_data_params, load_data
+from my_loader_newsplit import check_data_params, load_data
 
 args = get_args()
 
@@ -149,13 +149,13 @@ def concat_batches(x1, len1, x2, len2, pad_idx, eos_idx):
     return x, lengths
 
 
-def run_epoch(train_gen):
+def run_epoch(data_name, set_name):
     total_loss = 0
     start_time = time.time()
     batch = 0
     n_words = 0
-    epoch_size = (len(data['train'][('en', 'zh')]) // args.batch_size)
-    # for _ in range(10):
+    epoch_size = (len(data[data_name][set_name]) // args.batch_size)
+    train_gen = get_iterator(data_name, set_name)
     for x, lengths in tqdm(train_gen, total=epoch_size, ncols=100):
         # generate batch
         # x, lengths = next(train_gen)
@@ -199,54 +199,6 @@ def run_epoch(train_gen):
         batch += 1
 
 
-def adapt_epoch(data_name, set_name):
-    total_loss = 0
-    start_time = time.time()
-    batch = 0
-    n_words = 0
-    epoch_size = (len(data[data_name][set_name]) // args.batch_size)
-    adapt_iterator = get_iterator(data_name, set_name)
-    for x, lengths in tqdm(adapt_iterator, total=epoch_size, ncols=30):
-        # generate batch
-        # x, lengths = get_batch('penn', 'train')
-        alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
-        # -1 minus away the bos index, target is the sent and </s>
-        pred_mask = alen[None] < lengths[:, None] - 1
-        # if params.context_size > 0:  # do not predict without context
-        #     pred_mask[:params.context_size] = 0
-        # select target to be first word until eos
-        y = x[:, 1:].masked_select(pred_mask[:, :-1])
-        assert pred_mask.sum().item() == y.size(0)
-
-        x = x.to(device)
-        pred_mask = pred_mask.to(device)
-        y = y.to(device)
-
-        # forward / loss
-        model.train()
-        model_opt.zero_grad()
-        lm_logits = model(x)
-        lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
-
-        lm_losses = criterion(lm_logits, y)
-        lm_losses = lm_losses.sum() / torch.sum(pred_mask)
-        n_words += torch.sum(pred_mask)
-        lm_losses.backward()
-        model_opt.step()
-        total_loss += lm_losses.data * torch.sum(pred_mask)
-        if batch % args.log_interval == 0 and batch > 0:
-            cur_loss = total_loss / n_words
-            elapsed = time.time() - start_time
-            logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
-                         'loss {:5.2f} | ppl {:8.2f} |'.format(
-                epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
-                elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
-            total_loss = 0
-            n_words = 0
-            start_time = time.time()
-        batch += 1
-
-
 if __name__ == '__main__':
     best_val_loss = []
     stored_loss = 100000000
@@ -255,13 +207,10 @@ if __name__ == '__main__':
     try:
         for epoch in range(args.epochs):
             epoch_start_time = time.time()
-            train_iterator = get_iterator('train', ('en', 'zh'))
-            run_epoch(train_iterator)
-            train_iterator = get_iterator('train', ('zh', 'en'))
-            run_epoch(train_iterator)
-            adapt_epoch('cs', 'adapt')
-            # adapt_epoch('cs', 'cs')
-            valid_iterator = get_iterator('cs', 'test')
+            run_epoch('train', ('en', 'zh'))
+            run_epoch('train', ('zh', 'en'))
+
+            valid_iterator = get_iterator('cs', 'valid')
             val_loss = evaluate(valid_iterator)
             logger.info('-' * 89)
             logger.info('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
@@ -279,13 +228,59 @@ if __name__ == '__main__':
                 break
 
             best_val_loss.append(val_loss)
+        # adaptation
+        for epoch in range(args.epochs):
+            epoch_start_time = time.time()
+            run_epoch('cs', 'adapt')
+            valid_iterator = get_iterator('cs', 'valid')
+            val_loss = evaluate(valid_iterator)
+            logger.info('-' * 89)
+            logger.info('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
+                        'valid ppl {:8.2f} |'.format(
+                epoch, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
+            logger.info('-' * 89)
 
+            if val_loss < stored_loss:
+                torch.save(model.state_dict(), args.model + '_adapt.pt')
+                logger.info('Saving model (new best validation)')
+                stored_loss = val_loss
+            # Run on test data.
+            test_iterator = get_iterator('cs', 'test')
+            test_loss = evaluate(test_iterator)
+            logger.debug('=' * 89)
+            logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+                test_loss, math.exp(test_loss)))
+            logger.debug('=' * 89)
+            # Run on test data.
+            test_iterator = get_iterator('cs', 'test_cs')
+            test_loss = evaluate(test_iterator)
+            logger.debug('=' * 89)
+            logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+                test_loss, math.exp(test_loss)))
+            logger.debug('=' * 89)
+            # Run on test data.
+            test_iterator = get_iterator('cs', 'test_en')
+            test_loss = evaluate(test_iterator)
+            logger.debug('=' * 89)
+            logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+                test_loss, math.exp(test_loss)))
+            logger.debug('=' * 89)
+            # Run on test data.
+            test_iterator = get_iterator('cs', 'test_zh')
+            test_loss = evaluate(test_iterator)
+            logger.debug('=' * 89)
+            logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+                test_loss, math.exp(test_loss)))
+            logger.debug('=' * 89)
+            if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
+                logger.info('Early stop')
+                break
     except KeyboardInterrupt:
         logger.info('-' * 89)
         logger.info('Exiting from training early')
 
     # Load the best saved model.
-    model.load_state_dict(torch.load(args.model + '.pt'))
+    model.load_state_dict(torch.load(args.model + '_adapt.pt'))
 
     # Run on test data.
     test_iterator = get_iterator('cs', 'test')

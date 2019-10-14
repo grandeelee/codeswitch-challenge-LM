@@ -11,10 +11,10 @@ from options import get_args
 from logger import create_logger
 from transformer import LMModel
 from opt import OpenAIAdam
-from my_loader import load_mono_data
+from my_loader_newsplit import load_mono_data, check_data_params
 
 args = get_args()
-args.data = '../data/'
+args.model = '../save/xlm_run_2'
 # ================= initialization ========================
 logger = create_logger(args.model + '_eval.log')
 
@@ -33,10 +33,7 @@ logger.info("device: {} n_gpu: {}".format(device, n_gpu))
 args.batch_size = 50
 # args.n_ctx = 35
 # args.max_len = 33
-args.mono_dataset = {
-    splt: os.path.join(args.data, '{}.pth'.format(splt))
-    for splt in ['test']  #
-}
+check_data_params(args)
 
 # load data
 data = {}
@@ -93,7 +90,7 @@ criterion = nn.CrossEntropyLoss(reduction='none')
 
 logger.info("Model: {}".format(model))
 logger.info("Number of parameters (model): %i" % sum([p.numel() for p in model.parameters() if p.requires_grad]))
-model.load_state_dict(torch.load(args.model + '.pt', map_location='cpu'))
+model.load_state_dict(torch.load(args.model + '.pt'))
 model.to(device)
 model.eval()
 
@@ -152,7 +149,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     return logits
 
 
-def sample_sequence(args, model, length, temperature=1.0, top_k=20, top_p=0.0, device='cpu'):
+def sample_sequence(args, model, length, temperature=1.0, top_k=20, top_p=0.0):
     bos_idx = dico.word2id['<s>']
     context = torch.full((args.batch_size, 1), bos_idx, dtype=torch.long).to(device)
     with torch.no_grad():
@@ -166,17 +163,37 @@ def sample_sequence(args, model, length, temperature=1.0, top_k=20, top_p=0.0, d
 
 
 if __name__ == '__main__':
-    # epoch_start_time = time.time()
-    # valid_iterator = get_iterator('cs', 'test')
-    # val_loss = evaluate(valid_iterator)
-    # logger.info('-' * 89)
-    # logger.info('| end of evaluation | time: {:5.2f}s | valid loss {:5.2f} | '
-    #             'valid_en ppl {:8.2f} |'.format(
-    #     (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
-    # logger.info('-' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test')
+    test_loss = evaluate(test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_cs')
+    test_loss = evaluate(test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_en')
+    test_loss = evaluate(test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_zh')
+    test_loss = evaluate(test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
 
     generated = sample_sequence(args, model, args.n_ctx)
-    generated = generated.numpy()
+    generated = generated.cpu().numpy()
     generated_word = []
     for l in generated:
         for x in l:

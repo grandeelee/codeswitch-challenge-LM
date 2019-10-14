@@ -3,7 +3,7 @@ import os
 import numpy as np
 import torch
 
-from my_dataset import Dataset
+from my_dataset import Dataset, ParallelDataset
 from my_dictionary import BOS_WORD, EOS_WORD, PAD_WORD, UNK_WORD, MASK_WORD
 
 logger = getLogger(__name__)
@@ -97,11 +97,10 @@ def load_mono_data(params, data):
         get_iterator()
     """
     data['cs'] = {}
-
-    for splt in ['train', 'adapt', 'valid', 'test', 'test_en', 'test_zh', 'test_cs']:
-
+    for splt in ['valid', 'test', 'adapt', 'test_cs', 'test_zh', 'test_en']:
+        data['cs'][splt] = {}
         # load data / update dictionary parameters / update data
-        mono_data = load_binarized(params.mono_dataset['cs'][splt], params)
+        mono_data = load_binarized(params.mono_dataset[splt], params)
         set_dico_parameters(params, data, mono_data['dictionary'])
 
         # create batched dataset
@@ -116,6 +115,38 @@ def load_mono_data(params, data):
         logger.info("")
 
 
+def load_para_data(params, data):
+    """
+    Load parallel data.
+    data['dictionary']
+    data['para']
+        get_iterator()
+    """
+    data['train'] = {}
+
+    logger.info('============ Parallel data (%s-%s)' % ('en', 'zh'))
+
+    for i, splt in enumerate([('en', 'zh'), ('zh', 'en')]):
+        data['train'][splt] = {}
+
+        # load binarized datasets
+        path = params.para_dataset['train'][i]
+        src_data = load_binarized(path, params)
+
+        # update dictionary parameters
+        set_dico_parameters(params, data, src_data['dictionary'])
+
+        # create ParallelDataset en zh
+        dataset = Dataset(src_data['sentences'], src_data['positions'], src_data['dictionary'], params)
+
+        dataset.remove_long_sentences(params.max_len)
+        dataset.remove_unk_sentences()
+
+        data['train'][splt] = dataset
+
+        logger.info("")
+
+
 def check_data_params(params):
     """
     Check datasets parameters.
@@ -126,16 +157,26 @@ def check_data_params(params):
 
     # check monolingual datasets
     params.mono_dataset = {
-        'cs': {
-            splt: os.path.join(params.data, '{}.pth'.format(splt))
-            for splt in ['train', 'adapt', 'valid', 'test', 'test_en', 'test_zh', 'test_cs']  #
-        }
+        splt: os.path.join(params.data, '{}.pth'.format(splt))
+        for splt in ['valid', 'test', 'adapt', 'test_cs', 'test_zh', 'test_en']  #
     }
-    for paths in params.mono_dataset.values():
-        for p in paths.values():
-            if not os.path.isfile(p):
-                logger.error(f"{p} not found")
-    assert all([all([os.path.isfile(p) for p in paths.values()]) for paths in params.mono_dataset.values()])
+
+    for p in params.mono_dataset.values():
+        if not os.path.isfile(p):
+            logger.error(f"{p} not found")
+    assert all([os.path.isfile(p) for p in params.mono_dataset.values()])
+
+    # check parallel datasets
+    params.para_dataset = {
+        'train': (os.path.join(params.data, 'para.en-zh.pth'),
+                  os.path.join(params.data, 'para.zh-en.pth'))
+    }
+    for p1, p2 in params.para_dataset.values():
+        if not os.path.isfile(p1):
+            logger.error(f"{p1} not found")
+        if not os.path.isfile(p2):
+            logger.error(f"{p2} not found")
+    assert all([os.path.isfile(p1) and os.path.isfile(p2) for p1, p2 in params.para_dataset.values()])
 
 
 def load_data(params):
@@ -149,12 +190,18 @@ def load_data(params):
 
     # monolingual datasets
     load_mono_data(params, data)
+    load_para_data(params, data)
 
     # monolingual data summary
     logger.info('============ Data summary')
-    for data_set in data['cs'].keys():
+    for data_set in ['valid', 'test', 'adapt', 'test_cs', 'test_en', 'test_zh']:
         logger.info(
-            '{: <18} - {: >5} - {: >12}:{: >10}'.format('Monolingual data', data_set, 'cs', len(data['cs'][data_set])))
+            '{: <18} - {: >5} - {: >12}:{: >10}'.format('Monolingual data', data_set, 'cs',
+                                                        len(data['cs'][data_set])))
+    # parallel data summary
+    for (src, tgt) in data['train'].keys():
+        logger.info('{: <18} - {: >5} - {: >12}:{: >10}'.format('Parallel data', 'train', '%s-%s' % (src, tgt),
+                                                                len(data['train'][(src, tgt)])))
 
     logger.info("")
     return data
