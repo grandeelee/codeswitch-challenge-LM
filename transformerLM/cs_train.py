@@ -139,7 +139,7 @@ def run_epoch(data_name, set_name):
     n_words = 0
     epoch_size = (len(data[data_name][set_name]) // args.batch_size)
     train_iterator = get_iterator(data_name, set_name)
-    for x, lengths in tqdm(train_iterator, total=epoch_size, ncols=30):
+    for x, lengths in tqdm(train_iterator, total=epoch_size, ncols=100):
         # generate batch
         # x, lengths = get_batch('penn', 'train')
         alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)

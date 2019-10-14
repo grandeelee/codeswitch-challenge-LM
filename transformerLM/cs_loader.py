@@ -98,7 +98,7 @@ def load_mono_data(params, data):
     """
     data['cs'] = {}
 
-    for splt in ['train', 'adapt', 'cs', 'test']:
+    for splt in ['train', 'adapt', 'cs', 'test', 'test_en', 'test_zh', 'test_cs']:
 
         # load data / update dictionary parameters / update data
         mono_data = load_binarized(params.mono_dataset['cs'][splt], params)
@@ -128,7 +128,7 @@ def check_data_params(params):
     params.mono_dataset = {
         'cs': {
             splt: os.path.join(params.data, '{}.pth'.format(splt))
-            for splt in ['train', 'adapt', 'cs', 'test']  #
+            for splt in ['train', 'adapt', 'cs', 'test', 'test_en', 'test_zh', 'test_cs']  #
         }
     }
     for paths in params.mono_dataset.values():
