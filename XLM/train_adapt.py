@@ -33,7 +33,7 @@ args.batch_size = args.batch_size * max(n_gpu, 1)
 check_data_params(args)
 # load data
 data = load_data(args)
-args.log_interval = (len(data['train'][('en', 'zh')]) // args.batch_size) // 10
+args.log_interval = 1000
 args.vocab_size = len(data['dictionary'])
 assert args.max_len + 2 <= args.n_ctx, 'sequence length cannot accommodate max sent length'
 
@@ -149,16 +149,91 @@ def concat_batches(x1, len1, x2, len2, pad_idx, eos_idx):
     return x, lengths
 
 
-def run_epoch(data_name, set_name):
+def run_epoch():
     total_loss = 0
     start_time = time.time()
-    batch = 0
     n_words = 0
-    epoch_size = (len(data[data_name][set_name]) // args.batch_size)
-    train_gen = get_iterator(data_name, set_name)
-    for x, lengths in tqdm(train_gen, total=epoch_size, ncols=100):
+    epoch_size = args.epoch_size
+
+    for batch in tqdm(range(epoch_size), ncols=100):
         # generate batch
-        # x, lengths = next(train_gen)
+        x, lengths = get_batch('train', ('en', 'zh'))
+        # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
+        alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
+        # -1 minus away the bos index, target is the sent and </s>
+        pred_mask = alen[None] < lengths[:, None] - 1
+        # if params.context_size > 0:  # do not predict without context
+        #     pred_mask[:params.context_size] = 0
+        # select target to be first word until eos
+        y = x[:, 1:].masked_select(pred_mask[:, :-1])
+        assert pred_mask.sum().item() == y.size(0)
+
+        x = x.to(device)
+        pred_mask = pred_mask.to(device)
+        y = y.to(device)
+
+        # forward / loss
+        model.train()
+        model_opt.zero_grad()
+        lm_logits = model(x)
+        lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
+
+        lm_losses = criterion(lm_logits, y)
+        lm_losses = lm_losses.sum() / torch.sum(pred_mask)
+        n_words += torch.sum(pred_mask)
+        lm_losses.backward()
+        model_opt.step()
+        total_loss += lm_losses.data * torch.sum(pred_mask)
+
+        # generate batch
+        x, lengths = get_batch('train', ('zh', 'en'))
+        # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
+        alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
+        # -1 minus away the bos index, target is the sent and </s>
+        pred_mask = alen[None] < lengths[:, None] - 1
+        # if params.context_size > 0:  # do not predict without context
+        #     pred_mask[:params.context_size] = 0
+        # select target to be first word until eos
+        y = x[:, 1:].masked_select(pred_mask[:, :-1])
+        assert pred_mask.sum().item() == y.size(0)
+
+        x = x.to(device)
+        pred_mask = pred_mask.to(device)
+        y = y.to(device)
+
+        # forward / loss
+        model.train()
+        model_opt.zero_grad()
+        lm_logits = model(x)
+        lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
+
+        lm_losses = criterion(lm_logits, y)
+        lm_losses = lm_losses.sum() / torch.sum(pred_mask)
+        n_words += torch.sum(pred_mask)
+        lm_losses.backward()
+        model_opt.step()
+        total_loss += lm_losses.data * torch.sum(pred_mask)
+
+        if batch % args.log_interval == 0 and batch > 0:
+            cur_loss = total_loss / n_words
+            elapsed = time.time() - start_time
+            logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
+                         'loss {:5.2f} | ppl {:8.2f} |'.format(
+                epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
+                elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
+            total_loss = 0
+            n_words = 0
+            start_time = time.time()
+
+
+def run_adapt_epoch(generator):
+    total_loss = 0
+    start_time = time.time()
+    n_words = 0
+    batch = 0
+    epoch_size = args.epoch_size
+    for x, lengths in generator:
+        # generate batch
         # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
         alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
         # -1 minus away the bos index, target is the sent and </s>
@@ -198,7 +273,6 @@ def run_epoch(data_name, set_name):
             start_time = time.time()
         batch += 1
 
-
 if __name__ == '__main__':
     best_val_loss = []
     stored_loss = 100000000
@@ -207,9 +281,7 @@ if __name__ == '__main__':
     try:
         for epoch in range(args.epochs):
             epoch_start_time = time.time()
-            run_epoch('train', ('en', 'zh'))
-            run_epoch('train', ('zh', 'en'))
-
+            run_epoch()
             valid_iterator = get_iterator('cs', 'valid')
             val_loss = evaluate(valid_iterator)
             logger.info('-' * 89)
@@ -229,9 +301,11 @@ if __name__ == '__main__':
 
             best_val_loss.append(val_loss)
         # adaptation
+        best_val_loss = []
         for epoch in range(args.epochs):
             epoch_start_time = time.time()
-            run_epoch('cs', 'adapt')
+            adapt_iterater = get_iterator('cs', 'adapt')
+            run_adapt_epoch(adapt_iterater)
             valid_iterator = get_iterator('cs', 'valid')
             val_loss = evaluate(valid_iterator)
             logger.info('-' * 89)
@@ -275,6 +349,8 @@ if __name__ == '__main__':
             if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
                 logger.info('Early stop')
                 break
+            best_val_loss.append(val_loss)
+
     except KeyboardInterrupt:
         logger.info('-' * 89)
         logger.info('Exiting from training early')

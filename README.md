@@ -7,14 +7,17 @@ Some regularizing techniques are from:
 + [An Analysis of Neural Language Modeling at Multiple Scales](https://arxiv.org/abs/1803.08240)
 
 Datasets:
-+ SEAME test for testing
-+ SEAME adapt and train for replicating INTERSPEECH system
++ SEAME is divided into train, valid, test
++ train set is used for adaptation
++ SEAME test for testing, which is further divided into cs, en, zh
++ for replicating INTERSPEECH system
 + OpenSubtitle and others for training the cross-lingual system. Kept consistent with INTERSPEECH paper
 + MORE mono-lingual, and parallel data for training large system (when have time)
 
 Baseline:
 + The baseline model is a transformer model trained on synthetic code-switch data 
 + | end of epoch   5 | time: 5717.78s | valid loss  5.05 | valid ppl   **156.20** |
++ Refer to `cs_baseline.log` or `cs_big_baseline`
 + The baseline system is adapted with real code-switch data as outlined in INTERSPEECH paper
 + Validation perplexity is computed on SEAME test
 + The total vocabulary is 50K, did not trim to 26K because not comparing to other systems, can always trim down to 26k when necessary
@@ -44,6 +47,15 @@ Important Model parameters:
 n_vocab = 50k (keep vocab.count in a central location, always build dictionary from vocab)
 max_len = 33 for monolingual, 66 for parallel, 35 and 70 with BOS and EOS tokens (memory concern)
 n_ctx = 35 for monolingual, 70 for parallel
+emsize : 768
+n_heads : 12
+nlayers : 12
+embd_pdrop : 0.1
+dropouti : 0.4
+dropouth : 0.15
+dropout : 0.4
+attn_pdrop : 0.1
+resid_pdrop : 0.1
 ```
 
 Citations:
