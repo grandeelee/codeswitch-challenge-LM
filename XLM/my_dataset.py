@@ -48,7 +48,7 @@ class Dataset(object):
         assert len(self.pos) == np.sum(self.sent[self.pos[:, 1]] == eos)  # check sentences indices
         assert self.lengths.min() > 0  # check empty sentences
 
-    def batch_sentences(self, sentences):
+    def batch_sentences(self, sentences, direction='forward'):
         """
         Take as input a list of n sentences (torch.LongTensor vectors) and return
         a tensor of size (n, slen) where slen is the length of the longest
@@ -62,15 +62,21 @@ class Dataset(object):
 
         lengths = torch.LongTensor([len(s) + 2 for s in sentences])
         sent = torch.LongTensor(lengths.size(0), lengths.max().item()).fill_(pad_idx)
-        # set the start of the sequence to be eos and the end to be a pad
-        sent[:, 0] = bos_idx
-        for i, s in enumerate(sentences):
-            sent[i, 1:lengths[i] - 1].copy_(torch.from_numpy(s.astype(np.int64)))
-            sent[i, lengths[i] - 1] = eos_idx
+        if direction == 'forward':
+            # set the start of the sequence to be eos and the end to be a pad
+            sent[:, 0] = bos_idx
+            for i, s in enumerate(sentences):
+                sent[i, 1:lengths[i] - 1].copy_(torch.from_numpy(s.astype(np.int64)))
+                sent[i, lengths[i] - 1] = eos_idx
+        if direction == 'backward':
+            sent[:, 0] = eos_idx
+            for i, s in enumerate(sentences):
+                sent[i, 1:lengths[i] - 1].copy_(torch.from_numpy(s[::-1].astype(np.int64)))
+                sent[i, lengths[i] - 1] = bos_idx
 
         return sent, lengths
 
-    def remove_unk_sentences(self):
+    def remove_unk_sentences(self, unk_tol=0.2):
         """
         Remove sentences with more than 20% unknown tokens
         """
@@ -78,7 +84,7 @@ class Dataset(object):
         init_size = len(self.pos)
         indices = []
         for idx in range(len(self.pos)):
-            if np.sum(self.sent[self.pos[idx, 0]: self.pos[idx, 1]] == unk_idx) * 1.0 / self.lengths[idx] < 0.2:
+            if np.sum(self.sent[self.pos[idx, 0]: self.pos[idx, 1]] == unk_idx) * 1.0 / self.lengths[idx] < unk_tol:
                 indices.append(idx)
         self.pos = self.pos[indices]
         self.lengths = self.pos[:, 1] - self.pos[:, 0]
@@ -134,30 +140,28 @@ class Dataset(object):
         # sanity checks
         self.check()
 
-    def get_batches_iterator(self, batches, return_indices):
+    def get_batches_iterator(self, batches, direction='forward'):
         """
         Return a sentences iterator, given the associated sentence batches.
         """
-        assert type(return_indices) is bool
+        assert direction in ['forward', 'backward'], 'direction can only be forward or backward'
 
         for sentence_ids in batches:
-            if 0 < self.max_batch_size < len(sentence_ids):
-                np.random.shuffle(sentence_ids)
-                sentence_ids = sentence_ids[:self.max_batch_size]
+            # if 0 < self.max_batch_size < len(sentence_ids):
+            #     np.random.shuffle(sentence_ids)
+            #     sentence_ids = sentence_ids[:self.max_batch_size]
             pos = self.pos[sentence_ids]
             sent = [self.sent[a:b] for a, b in pos]
-            sent = self.batch_sentences(sent)
-            yield (sent, sentence_ids) if return_indices else sent
+            sent = self.batch_sentences(sent, direction)
+            yield sent
 
-    def get_iterator(self, shuffle, group_by_size=False, return_indices=False):
+    def get_iterator(self, shuffle, group_by_size=False, return_indices=False, direction='forward'):
         """
         Return a sentences iterator.
         """
-        # assert seed is None or shuffle is True and type(seed) is int
-        # rng = np.random.RandomState()
+        assert direction in ['forward', 'backward'], 'direction can only be forward or backward'
         n_sentences = len(self.pos)
         assert type(shuffle) is bool and type(group_by_size) is bool
-        # assert group_by_size is False or shuffle is True
 
         # sentence lengths
         lengths = self.lengths + 2
@@ -195,7 +199,7 @@ class Dataset(object):
         assert lengths[indices].sum() == sum([lengths[x].sum() for x in batches])
 
         # return the iterator
-        return self.get_batches_iterator(batches, return_indices)
+        return self.get_batches_iterator(batches, direction)
 
 
 class ParallelDataset(Dataset):
@@ -243,7 +247,7 @@ class ParallelDataset(Dataset):
         assert self.lengths.min() > 0  # check empty sentences
         assert self.lengths2.min() > 0  # check empty sentences
 
-    def remove_unk_sentences(self):
+    def remove_unk_sentences(self, unk_tol=0.2):
         """
         Remove sentences with more than 20% unknown tokens
         """
@@ -323,23 +327,24 @@ class ParallelDataset(Dataset):
         # sanity checks
         self.check()
 
-    def get_batches_iterator(self, batches, return_indices):
+    def get_batches_iterator(self, batches, direction='forward'):
         """
         Return a sentences iterator, given the associated sentence batches.
         """
-        assert type(return_indices) is bool
+        assert direction in ['forward', 'backward'], 'direction can only be forward or backward'
 
         for sentence_ids in batches:
             pos1 = self.pos[sentence_ids]
             pos2 = self.pos2[sentence_ids]
-            sent1 = self.batch_sentences([self.sent[a:b] for a, b in pos1])
-            sent2 = self.batch_sentences([self.sent2[a:b] for a, b in pos2])
-            yield (sent1, sent2, sentence_ids) if return_indices else (sent1, sent2)
+            sent1 = self.batch_sentences([self.sent[a:b] for a, b in pos1], direction)
+            sent2 = self.batch_sentences([self.sent2[a:b] for a, b in pos2], direction)
+            yield (sent1, sent2)
 
-    def get_iterator(self, shuffle, group_by_size=False, return_indices=False):
+    def get_iterator(self, shuffle, group_by_size=False, return_indices=False, direction='forward'):
         """
         Return a sentences iterator.
         """
+        assert direction in ['forward', 'backward'], 'direction can only be forward or backward'
         n_sentences = len(self.pos)
         assert type(shuffle) is bool and type(group_by_size) is bool
 
@@ -376,7 +381,7 @@ class ParallelDataset(Dataset):
         # assert set.union(*[set(x.tolist()) for x in batches]) == set(range(n_sentences))  # slow
 
         # return the iterator
-        return self.get_batches_iterator(batches, return_indices)
+        return self.get_batches_iterator(batches, direction)
 
 
 if __name__ == '__main__':

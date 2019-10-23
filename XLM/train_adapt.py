@@ -45,7 +45,7 @@ logger.info('------------------------------------------------')
 iterators = {}
 
 
-def get_iterator(iter_name, data_set):
+def get_iterator(iter_name, data_set, direction='forward'):
     """
     Create a new iterator for a dataset.
     """
@@ -55,25 +55,26 @@ def get_iterator(iter_name, data_set):
     iterator = data[iter_name][data_set].get_iterator(
         shuffle=True,
         group_by_size=False,
+        direction=direction
     )
 
-    iterators[(iter_name, data_set)] = iterator
+    iterators[(iter_name, data_set, direction)] = iterator
     return iterator
 
 
-def get_batch(iter_name, data_set):
+def get_batch(iter_name, data_set, direction='forward'):
     """
     Return a batch of sentences from a dataset.
     iter_name : causal
     :return batch, lengths
     """
-    iterator = iterators.get((iter_name, data_set), None)
+    iterator = iterators.get((iter_name, data_set, direction), None)
     if iterator is None:
-        iterator = get_iterator(iter_name, data_set)
+        iterator = get_iterator(iter_name, data_set, direction)
     try:
         x = next(iterator)
     except StopIteration:
-        iterator = get_iterator(iter_name, data_set)
+        iterator = get_iterator(iter_name, data_set, direction)
         x = next(iterator)
     return x
 
@@ -83,7 +84,7 @@ def get_batch(iter_name, data_set):
 model = LMModel(args, args.vocab_size, args.n_ctx)
 criterion = nn.CrossEntropyLoss(reduction='none')
 
-n_updates_total = (len(data['train'][('en', 'zh')]) * 2 // args.batch_size) * args.epochs
+n_updates_total = (len(data['train'][('en', 'zh')]) * 4 // args.batch_size) * args.epochs
 model_opt = OpenAIAdam(model.parameters(),
                        lr=args.lr,
                        schedule=args.lr_schedule,
@@ -153,125 +154,132 @@ def run_epoch():
     total_loss = 0
     start_time = time.time()
     n_words = 0
-    epoch_size = args.epoch_size
+    epoch_size = 2 #args.epoch_size
 
     for batch in tqdm(range(epoch_size), ncols=100):
-        # generate batch
-        x, lengths = get_batch('train', ('en', 'zh'))
-        # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
-        alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
-        # -1 minus away the bos index, target is the sent and </s>
-        pred_mask = alen[None] < lengths[:, None] - 1
-        # if params.context_size > 0:  # do not predict without context
-        #     pred_mask[:params.context_size] = 0
-        # select target to be first word until eos
-        y = x[:, 1:].masked_select(pred_mask[:, :-1])
-        assert pred_mask.sum().item() == y.size(0)
+        for direction in ['forward', 'backward']:
+            # generate batch
+            x, lengths = get_batch('train', ('en', 'zh'), direction)
 
-        x = x.to(device)
-        pred_mask = pred_mask.to(device)
-        y = y.to(device)
+            x_word = [data['dictionary'][i.item()] for s in x for i in s]
+            logger.debug(' '.join(s) + '\n' for s in x_word)
 
-        # forward / loss
-        model.train()
-        model_opt.zero_grad()
-        lm_logits = model(x)
-        lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
+            # # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
+            # alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
+            # # -1 minus away the bos index, target is the sent and </s>
+            # pred_mask = alen[None] < lengths[:, None] - 1
+            # # if params.context_size > 0:  # do not predict without context
+            # #     pred_mask[:params.context_size] = 0
+            # # select target to be first word until eos
+            # y = x[:, 1:].masked_select(pred_mask[:, :-1])
+            # assert pred_mask.sum().item() == y.size(0)
+            #
+            # x = x.to(device)
+            # pred_mask = pred_mask.to(device)
+            # y = y.to(device)
+            #
+            # # forward / loss
+            # model.train()
+            # model_opt.zero_grad()
+            # lm_logits = model(x)
+            # lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
+            #
+            # lm_losses = criterion(lm_logits, y)
+            # lm_losses = lm_losses.sum() / torch.sum(pred_mask)
+            # n_words += torch.sum(pred_mask)
+            # lm_losses.backward()
+            # model_opt.step()
+            # total_loss += lm_losses.data * torch.sum(pred_mask)
+            #
+            # # generate batch
+            # x, lengths = get_batch('train', ('zh', 'en'), direction)
+            # # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
+            # alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
+            # # -1 minus away the bos index, target is the sent and </s>
+            # pred_mask = alen[None] < lengths[:, None] - 1
+            # # if params.context_size > 0:  # do not predict without context
+            # #     pred_mask[:params.context_size] = 0
+            # # select target to be first word until eos
+            # y = x[:, 1:].masked_select(pred_mask[:, :-1])
+            # assert pred_mask.sum().item() == y.size(0)
+            #
+            # x = x.to(device)
+            # pred_mask = pred_mask.to(device)
+            # y = y.to(device)
+            #
+            # # forward / loss
+            # model.train()
+            # model_opt.zero_grad()
+            # lm_logits = model(x)
+            # lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
+            #
+            # lm_losses = criterion(lm_logits, y)
+            # lm_losses = lm_losses.sum() / torch.sum(pred_mask)
+            # n_words += torch.sum(pred_mask)
+            # lm_losses.backward()
+            # model_opt.step()
+            # total_loss += lm_losses.data * torch.sum(pred_mask)
+            #
+            # if batch % args.log_interval == 0 and batch > 0:
+            #     cur_loss = total_loss / n_words
+            #     elapsed = time.time() - start_time
+            #     logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
+            #                  'loss {:5.2f} | ppl {:8.2f} |'.format(
+            #         epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
+            #         elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
+            #     total_loss = 0
+            #     n_words = 0
+            #     start_time = time.time()
 
-        lm_losses = criterion(lm_logits, y)
-        lm_losses = lm_losses.sum() / torch.sum(pred_mask)
-        n_words += torch.sum(pred_mask)
-        lm_losses.backward()
-        model_opt.step()
-        total_loss += lm_losses.data * torch.sum(pred_mask)
 
-        # generate batch
-        x, lengths = get_batch('train', ('zh', 'en'))
-        # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
-        alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
-        # -1 minus away the bos index, target is the sent and </s>
-        pred_mask = alen[None] < lengths[:, None] - 1
-        # if params.context_size > 0:  # do not predict without context
-        #     pred_mask[:params.context_size] = 0
-        # select target to be first word until eos
-        y = x[:, 1:].masked_select(pred_mask[:, :-1])
-        assert pred_mask.sum().item() == y.size(0)
-
-        x = x.to(device)
-        pred_mask = pred_mask.to(device)
-        y = y.to(device)
-
-        # forward / loss
-        model.train()
-        model_opt.zero_grad()
-        lm_logits = model(x)
-        lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
-
-        lm_losses = criterion(lm_logits, y)
-        lm_losses = lm_losses.sum() / torch.sum(pred_mask)
-        n_words += torch.sum(pred_mask)
-        lm_losses.backward()
-        model_opt.step()
-        total_loss += lm_losses.data * torch.sum(pred_mask)
-
-        if batch % args.log_interval == 0 and batch > 0:
-            cur_loss = total_loss / n_words
-            elapsed = time.time() - start_time
-            logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
-                         'loss {:5.2f} | ppl {:8.2f} |'.format(
-                epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
-                elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
-            total_loss = 0
-            n_words = 0
-            start_time = time.time()
-
-
-def run_adapt_epoch(generator):
+def run_adapt_epoch(iter_name, data_set):
     total_loss = 0
     start_time = time.time()
     n_words = 0
-    batch = 0
-    epoch_size = args.epoch_size
-    for x, lengths in generator:
-        # generate batch
-        # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
-        alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
-        # -1 minus away the bos index, target is the sent and </s>
-        pred_mask = alen[None] < lengths[:, None] - 1
-        # if params.context_size > 0:  # do not predict without context
-        #     pred_mask[:params.context_size] = 0
-        # select target to be first word until eos
-        y = x[:, 1:].masked_select(pred_mask[:, :-1])
-        assert pred_mask.sum().item() == y.size(0)
-
-        x = x.to(device)
-        pred_mask = pred_mask.to(device)
-        y = y.to(device)
-
-        # forward / loss
-        model.train()
-        model_opt.zero_grad()
-        lm_logits = model(x)
-        lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
-
-        lm_losses = criterion(lm_logits, y)
-        lm_losses = lm_losses.sum() / torch.sum(pred_mask)
-        n_words += torch.sum(pred_mask)
-        lm_losses.backward()
-        model_opt.step()
-        total_loss += lm_losses.data * torch.sum(pred_mask)
-
-        if batch % args.log_interval == 0 and batch > 0:
-            cur_loss = total_loss / n_words
-            elapsed = time.time() - start_time
-            logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
-                         'loss {:5.2f} | ppl {:8.2f} |'.format(
-                epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
-                elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
-            total_loss = 0
-            n_words = 0
-            start_time = time.time()
-        batch += 1
+    epoch_size = 2 #len(data[iter_name][data_set]) // args.batch_size + 1
+    for batch in tqdm(range(epoch_size), ncols=100):
+        for direction in ['forward', 'backward']:
+            # generate batch
+            x, lengths = get_batch(iter_name, data_set, direction)
+            x_word = [data['dictionary'][i.item()] for s in x for i in s]
+            logger.debug(' '.join(s) + '\n' for s in x_word)
+            # # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
+            # alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
+            # # -1 minus away the bos index, target is the sent and </s>
+            # pred_mask = alen[None] < lengths[:, None] - 1
+            # # if params.context_size > 0:  # do not predict without context
+            # #     pred_mask[:params.context_size] = 0
+            # # select target to be first word until eos
+            # y = x[:, 1:].masked_select(pred_mask[:, :-1])
+            # assert pred_mask.sum().item() == y.size(0)
+            #
+            # x = x.to(device)
+            # pred_mask = pred_mask.to(device)
+            # y = y.to(device)
+            #
+            # # forward / loss
+            # model.train()
+            # model_opt.zero_grad()
+            # lm_logits = model(x)
+            # lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
+            #
+            # lm_losses = criterion(lm_logits, y)
+            # lm_losses = lm_losses.sum() / torch.sum(pred_mask)
+            # n_words += torch.sum(pred_mask)
+            # lm_losses.backward()
+            # model_opt.step()
+            # total_loss += lm_losses.data * torch.sum(pred_mask)
+            #
+            # if batch % args.log_interval == 0 and batch > 0:
+            #     cur_loss = total_loss / n_words
+            #     elapsed = time.time() - start_time
+            #     logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
+            #                  'loss {:5.2f} | ppl {:8.2f} |'.format(
+            #         epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
+            #         elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
+            #     total_loss = 0
+            #     n_words = 0
+            #     start_time = time.time()
 
 if __name__ == '__main__':
     best_val_loss = []
@@ -279,7 +287,7 @@ if __name__ == '__main__':
 
     # At any point you can hit Ctrl + C to break out of training early.
     try:
-        for epoch in range(args.epochs):
+        for epoch in range(2): #args.epochs):
             epoch_start_time = time.time()
             run_epoch()
             valid_iterator = get_iterator('cs', 'valid')
@@ -302,10 +310,9 @@ if __name__ == '__main__':
             best_val_loss.append(val_loss)
         # adaptation
         best_val_loss = []
-        for epoch in range(args.epochs):
+        for epoch in range(2): #args.epochs):
             epoch_start_time = time.time()
-            adapt_iterater = get_iterator('cs', 'adapt')
-            run_adapt_epoch(adapt_iterater)
+            run_adapt_epoch('cs', 'valid')
             valid_iterator = get_iterator('cs', 'valid')
             val_loss = evaluate(valid_iterator)
             logger.info('-' * 89)

@@ -24,7 +24,8 @@ Baseline:
 
 Improved system:
 + keeping the same vocabulary, dataset and test set and adaptation set
-+ | end of epoch   5 | time: 28817.31s | valid loss  4.90 | valid_en ppl   **134.66** |
++ | End of training | test loss  4.77 | test ppl   **118.32** |
++ Refer to `xlm_baseline_mix.log`
 + Prelim result shows that idea is working
 
 Analysis:

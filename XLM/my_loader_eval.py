@@ -97,7 +97,7 @@ def load_mono_data(params, data):
         get_iterator()
     """
     data['cs'] = {}
-    for splt in ['valid', 'test', 'adapt', 'test_cs', 'test_zh', 'test_en']:
+    for splt in ['eval']:
         data['cs'][splt] = {}
         # load data / update dictionary parameters / update data
         mono_data = load_binarized(params.mono_dataset[splt], params)
@@ -158,7 +158,7 @@ def check_data_params(params):
     # check monolingual datasets
     params.mono_dataset = {
         splt: os.path.join(params.data, '{}.pth'.format(splt))
-        for splt in ['valid', 'test', 'adapt', 'test_cs', 'test_zh', 'test_en']  #
+        for splt in ['eval']  #
     }
 
     for p in params.mono_dataset.values():
@@ -166,18 +166,18 @@ def check_data_params(params):
             logger.error(f"{p} not found")
     assert all([os.path.isfile(p) for p in params.mono_dataset.values()])
 
-    # check parallel datasets
-    params.para_dataset = {
-        'train': (os.path.join(params.data, 'para.en-zh.pth'),
-                  os.path.join(params.data, 'para.zh-en.pth'))
-    }
-    for p1, p2 in params.para_dataset.values():
-        if not os.path.isfile(p1):
-            logger.error(f"{p1} not found")
-        if not os.path.isfile(p2):
-            logger.error(f"{p2} not found")
-    assert all([os.path.isfile(p1) and os.path.isfile(p2) for p1, p2 in params.para_dataset.values()])
-
+    # # check parallel datasets
+    # params.para_dataset = {
+    #     'train': (os.path.join(params.data, 'para.en-zh.pth'),
+    #               os.path.join(params.data, 'para.zh-en.pth'))
+    # }
+    # for p1, p2 in params.para_dataset.values():
+    #     if not os.path.isfile(p1):
+    #         logger.error(f"{p1} not found")
+    #     if not os.path.isfile(p2):
+    #         logger.error(f"{p2} not found")
+    # assert all([os.path.isfile(p1) and os.path.isfile(p2) for p1, p2 in params.para_dataset.values()])
+    #
 
 def load_data(params):
     """
@@ -190,18 +190,18 @@ def load_data(params):
 
     # monolingual datasets
     load_mono_data(params, data)
-    load_para_data(params, data)
+    # load_para_data(params, data)
 
     # monolingual data summary
     logger.info('============ Data summary')
-    for data_set in ['valid', 'test', 'adapt', 'test_cs', 'test_en', 'test_zh']:
+    for data_set in ['eval']:
         logger.info(
             '{: <18} - {: >5} - {: >12}:{: >10}'.format('Monolingual data', data_set, 'cs',
                                                         len(data['cs'][data_set])))
-    # parallel data summary
-    for (src, tgt) in data['train'].keys():
-        logger.info('{: <18} - {: >5} - {: >12}:{: >10}'.format('Parallel data', 'train', '%s-%s' % (src, tgt),
-                                                                len(data['train'][(src, tgt)])))
+    # # parallel data summary
+    # for (src, tgt) in data['train'].keys():
+    #     logger.info('{: <18} - {: >5} - {: >12}:{: >10}'.format('Parallel data', 'train', '%s-%s' % (src, tgt),
+    #                                                             len(data['train'][(src, tgt)])))
 
     logger.info("")
     return data
