@@ -161,8 +161,9 @@ def run_epoch():
             # generate batch
             x, lengths = get_batch('train', ('en', 'zh'), direction)
 
-            x_word = [data['dictionary'][i.item()] for s in x for i in s]
-            logger.debug(' '.join(s) + '\n' for s in x_word)
+            for sent in x:
+                x_word = [data['dictionary'][i.item()] for i in sent]
+                logger.debug('{}'.format(' '.join(x_word)))
 
             # # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
             # alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
@@ -241,8 +242,9 @@ def run_adapt_epoch(iter_name, data_set):
         for direction in ['forward', 'backward']:
             # generate batch
             x, lengths = get_batch(iter_name, data_set, direction)
-            x_word = [data['dictionary'][i.item()] for s in x for i in s]
-            logger.debug(' '.join(s) + '\n' for s in x_word)
+            for sent in x:
+                x_word = [data['dictionary'][i.item()] for i in sent]
+                logger.debug('{}'.format(' '.join(x_word)))
             # # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
             # alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
             # # -1 minus away the bos index, target is the sent and </s>
