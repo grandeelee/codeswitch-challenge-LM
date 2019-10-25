@@ -337,9 +337,9 @@ if __name__ == '__main__':
                     test_loss, math.exp(test_loss)))
                 logger.debug('=' * 89)
 
-            # if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
-            #     logger.info('Early stop')
-            #     break
+            if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
+                logger.info('Early stop')
+                break
 
             best_val_loss.append(val_loss)
 
@@ -402,9 +402,9 @@ if __name__ == '__main__':
                     test_loss, math.exp(test_loss)))
                 logger.debug('=' * 89)
 
-            # if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
-            #     logger.info('Early stop')
-            #     break
+            if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
+                logger.info('Early stop')
+                break
 
             best_val_loss.append(val_loss)
 
