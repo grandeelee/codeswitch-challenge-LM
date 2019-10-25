@@ -84,7 +84,7 @@ def get_batch(iter_name, data_set, direction='forward'):
 model = LMModel(args, args.vocab_size, args.n_ctx)
 criterion = nn.CrossEntropyLoss(reduction='none')
 
-n_updates_total = (len(data['train'][('en', 'zh')]) * 2 // args.batch_size) * args.epochs
+n_updates_total = (len(data['train'][('en', 'zh')]) * 4 // args.batch_size) * args.epochs
 model_opt = OpenAIAdam(model.parameters(),
                        lr=args.lr,
                        schedule=args.lr_schedule,
@@ -221,16 +221,16 @@ def run_epoch():
             model_opt.step()
             total_loss += lm_losses.data * torch.sum(pred_mask)
 
-            if batch % args.log_interval == 0 and batch > 0:
-                cur_loss = total_loss / n_words
-                elapsed = time.time() - start_time
-                logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
-                             'loss {:5.2f} | ppl {:8.2f} |'.format(
-                    epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
-                    elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
-                total_loss = 0
-                n_words = 0
-                start_time = time.time()
+        if batch % args.log_interval == 0 and batch > 0:
+            cur_loss = total_loss / n_words
+            elapsed = time.time() - start_time
+            logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
+                         'loss {:5.2f} | ppl {:8.2f} |'.format(
+                epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
+                elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
+            total_loss = 0
+            n_words = 0
+            start_time = time.time()
 
 
 def run_adapt_epoch(iter_name, data_set):
@@ -272,16 +272,16 @@ def run_adapt_epoch(iter_name, data_set):
             model_opt.step()
             total_loss += lm_losses.data * torch.sum(pred_mask)
 
-            if batch % args.log_interval == 0 and batch > 0:
-                cur_loss = total_loss / n_words
-                elapsed = time.time() - start_time
-                logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
-                             'loss {:5.2f} | ppl {:8.2f} |'.format(
-                    epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
-                    elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
-                total_loss = 0
-                n_words = 0
-                start_time = time.time()
+        if batch % args.log_interval == 0 and batch > 0:
+            cur_loss = total_loss / n_words
+            elapsed = time.time() - start_time
+            logger.debug('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | ms/batch {:5.2f} | '
+                         'loss {:5.2f} | ppl {:8.2f} |'.format(
+                epoch + 1, batch, epoch_size, model_opt.param_groups[0]['lr'],
+                elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
+            total_loss = 0
+            n_words = 0
+            start_time = time.time()
 
 if __name__ == '__main__':
     best_val_loss = []
@@ -300,21 +300,24 @@ if __name__ == '__main__':
                 epoch + 1, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
             logger.info('-' * 89)
 
+            torch.save(model.state_dict(), args.model + '_train.pt')
+            logger.info('Saving model')
+
             if val_loss < stored_loss:
-                torch.save(model.state_dict(), args.model + '.pt')
+                torch.save(model.state_dict(), args.model + '_valid.pt')
                 logger.info('Saving model (new best validation)')
                 stored_loss = val_loss
 
-            if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
-                logger.info('Early stop')
-                break
+            # if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
+            #     logger.info('Early stop')
+            #     break
 
             best_val_loss.append(val_loss)
         # adaptation
         best_val_loss = []
-        for epoch in range(args.epochs):
+        for epoch in range(7):
             epoch_start_time = time.time()
-            run_adapt_epoch('cs', 'valid')
+            run_adapt_epoch('cs', 'adapt')
             valid_iterator = get_iterator('cs', 'valid')
             val_loss = evaluate(valid_iterator)
             logger.info('-' * 89)
@@ -355,9 +358,9 @@ if __name__ == '__main__':
             logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
                 test_loss, math.exp(test_loss)))
             logger.debug('=' * 89)
-            if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
-                logger.info('Early stop')
-                break
+            # if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
+            #     logger.info('Early stop')
+            #     break
             best_val_loss.append(val_loss)
 
     except KeyboardInterrupt:
