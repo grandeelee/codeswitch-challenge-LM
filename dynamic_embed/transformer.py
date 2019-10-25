@@ -57,7 +57,7 @@ class ScaledDotProductAttention(nn.Module):
         s_len = q.size(-2)
         alen = torch.arange(s_len, dtype=torch.long, device=q.device)
         mask = alen[None, :] <= alen[:, None]
-        mask = mask.long().unsqueeze(0).unsqueeze(0)
+        mask = mask.float().unsqueeze(0).unsqueeze(0)
         w = torch.matmul(q, k)
         w = w / math.sqrt(v.size(-1))
         w = w * mask + -1e9 * (1 - mask)
