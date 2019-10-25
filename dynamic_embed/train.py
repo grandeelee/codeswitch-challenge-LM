@@ -6,11 +6,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-from dynamic_embed.src.options import get_args
-from dynamic_embed.src.logger import create_logger
-from dynamic_embed.src.transformer import LMModel
-from dynamic_embed.src.opt import OpenAIAdam
-from dynamic_embed.dataset.my_loader import check_data_params, load_data
+from .src.options import get_args
+from .src.logger import create_logger
+from .src.transformer import LMModel
+from .src.opt import OpenAIAdam
+from .dataset.my_loader import check_data_params, load_data
 
 args = get_args()
 
