@@ -198,9 +198,9 @@ class LMModel(nn.Module):
         super(LMModel, self).__init__()
         assert vocab > 0
         self.transformer = TransformerModel(cfg, vocab=vocab)
-        embed_shape = self.transformer.embed.weight.shape
-        self.decoder = nn.Linear(embed_shape[1], embed_shape[0], bias=False)
-        self.decoder.weight = self.transformer.embed.weight  # Tied weights
+        # embed_shape = self.transformer.embed.weight.shape
+        self.decoder = nn.Linear(cfg.emsize * (cfg.nlayers + 1), vocab, bias=False)
+        # self.decoder.weight = self.transformer.embed.weight  # Tied weights
         self.return_probs = return_probs
         if self.return_probs:
             pos_emb_mask = torch.zeros(1, 1, vocab)
