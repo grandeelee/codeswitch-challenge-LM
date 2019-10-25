@@ -5,8 +5,8 @@ import torch.nn.functional as F
 import numpy as np
 import math
 import copy
-from regularizer.locked_dropout import LockedDropout, MaskDropout
-from regularizer.embed_regularize import embedded_dropout
+from locked_dropout import LockedDropout, MaskDropout
+from embed_regularize import embedded_dropout
 
 logger = getLogger(__name__)
 

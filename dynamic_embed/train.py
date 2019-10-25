@@ -6,11 +6,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-from src.options import get_args
-from src.logger import create_logger
-from src.transformer import LMModel
-from src.opt import OpenAIAdam
-from dataset.my_loader import check_data_params, load_data
+from options import get_args
+from logger import create_logger
+from transformer import LMModel
+from opt import OpenAIAdam
+from my_loader import check_data_params, load_data
 
 args = get_args()
 
