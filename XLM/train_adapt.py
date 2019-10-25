@@ -344,6 +344,7 @@ if __name__ == '__main__':
             best_val_loss.append(val_loss)
 
         # adaptation
+        model.load_state_dict(torch.load(args.model + '_valid.pt'))
         n_updates_total = (len(data['cs']['adapt']) * 2 // args.batch_size) * 7
         model_opt = OpenAIAdam(model.parameters(),
                                lr=args.lr,
@@ -404,6 +405,7 @@ if __name__ == '__main__':
             # if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
             #     logger.info('Early stop')
             #     break
+
             best_val_loss.append(val_loss)
 
     except KeyboardInterrupt:
