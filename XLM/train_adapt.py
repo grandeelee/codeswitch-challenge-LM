@@ -81,30 +81,6 @@ def get_batch(iter_name, data_set, direction='forward'):
 
 # =================== end of data set preparation ============
 
-model = LMModel(args, args.vocab_size, args.n_ctx)
-criterion = nn.CrossEntropyLoss(reduction='none')
-
-n_updates_total = (len(data['train'][('en', 'zh')]) * 4 // args.batch_size) * args.epochs
-model_opt = OpenAIAdam(model.parameters(),
-                       lr=args.lr,
-                       schedule=args.lr_schedule,
-                       warmup=args.lr_warmup,
-                       t_total=n_updates_total,
-                       b1=args.b1,
-                       b2=args.b2,
-                       e=args.e,
-                       l2=args.l2,
-                       vector_l2=args.vector_l2,
-                       max_grad_norm=args.max_grad_norm)
-
-logger.info("Model: {}".format(model))
-logger.info("Number of parameters (model): %i" % sum([p.numel() for p in model.parameters() if p.requires_grad]))
-
-model.to(device)
-
-
-# model = nn.DataParallel(model)
-
 
 def evaluate(generator):
     # Turn on evaluation mode which disables dropout.
@@ -283,7 +259,31 @@ def run_adapt_epoch(iter_name, data_set):
             n_words = 0
             start_time = time.time()
 
+
 if __name__ == '__main__':
+    model = LMModel(args, args.vocab_size, args.n_ctx)
+    criterion = nn.CrossEntropyLoss(reduction='none')
+
+    n_updates_total = (len(data['train'][('en', 'zh')]) * 4 // args.batch_size) * args.epochs
+    model_opt = OpenAIAdam(model.parameters(),
+                           lr=args.lr,
+                           schedule=args.lr_schedule,
+                           warmup=args.lr_warmup,
+                           t_total=n_updates_total,
+                           b1=args.b1,
+                           b2=args.b2,
+                           e=args.e,
+                           l2=args.l2,
+                           vector_l2=args.vector_l2,
+                           max_grad_norm=args.max_grad_norm)
+
+    logger.info("Model: {}".format(model))
+    logger.info("Number of parameters (model): %i" % sum([p.numel() for p in model.parameters() if p.requires_grad]))
+
+    model.to(device)
+
+    # model = nn.DataParallel(model)
+
     best_val_loss = []
     stored_loss = 100000000
 
@@ -336,12 +336,26 @@ if __name__ == '__main__':
                 logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
                     test_loss, math.exp(test_loss)))
                 logger.debug('=' * 89)
+
             # if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
             #     logger.info('Early stop')
             #     break
 
             best_val_loss.append(val_loss)
+
         # adaptation
+        n_updates_total = (len(data['cs']['adapt']) * 2 // args.batch_size) * 7
+        model_opt = OpenAIAdam(model.parameters(),
+                               lr=args.lr,
+                               schedule=args.lr_schedule,
+                               warmup=args.lr_warmup,
+                               t_total=n_updates_total,
+                               b1=args.b1,
+                               b2=args.b2,
+                               e=args.e,
+                               l2=args.l2,
+                               vector_l2=args.vector_l2,
+                               max_grad_norm=args.max_grad_norm)
         best_val_loss = []
         for epoch in range(7):
             epoch_start_time = time.time()
@@ -386,6 +400,7 @@ if __name__ == '__main__':
                 logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
                     test_loss, math.exp(test_loss)))
                 logger.debug('=' * 89)
+
             # if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
             #     logger.info('Early stop')
             #     break
