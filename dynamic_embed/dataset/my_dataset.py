@@ -2,7 +2,7 @@ from logging import getLogger
 import math
 import numpy as np
 import torch
-from my_dictionary import BOS_WORD, EOS_WORD, PAD_WORD, UNK_WORD, MASK_WORD
+from .my_dictionary import BOS_WORD, EOS_WORD, PAD_WORD, UNK_WORD, MASK_WORD
 
 logger = getLogger(__name__)
 
