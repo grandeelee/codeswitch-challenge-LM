@@ -148,8 +148,14 @@ class Block(nn.Module):
     def __init__(self, cfg, layer_id):
         super(Block, self).__init__()
         self.layer_id = layer_id + 1
-        self.n_heads = cfg.n_heads
         nx = cfg.emsize * self.layer_id
+        if cfg.grow_dim:
+            assert nx % cfg.n_heads == 0
+            self.n_heads = cfg.n_heads
+            self.split_size = nx // self.n_heads
+        if cfg.grow_head:
+            self.split_size = cfg.emsize
+            self.dim = nx
         self.attn = MultiHeadAttention(nx, cfg)
         self.ln_1 = LayerNorm(nx)
         self.mlp = MLP(nx, cfg)
