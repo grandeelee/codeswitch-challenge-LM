@@ -6,7 +6,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='Transformer based Language Model')
     # directory
     parser.add_argument('--data', type=str, default='../data/penn/', help='location of the data corpus')
-    parser.add_argument('--model', type=str, default='../save/dynamic_embed/embed_grow_tied_DimGrow', help='location of the model')
+    parser.add_argument('--model', type=str, default='../save/dynamic_embed/embed_grow_tied_HeadGrow', help='location of the model')
 
     # model
     parser.add_argument('--pos_embed', type=bool, default=False, help='whether use position embedding')
@@ -15,6 +15,8 @@ def get_args():
     parser.add_argument('--n_heads', type=int, default=12)
     parser.add_argument('--nlayers', type=int, default=12, help='number of layers')
     parser.add_argument('--tied', action='store_true', help='tie the word embedding and softmax weights')
+    parser.add_argument('--grow_head', type=bool, default=False, help='grow dim-wise with each layer')
+    parser.add_argument('--grow_head', type=bool, default=True, help='grow head with each layer')
 
     # optimization
     parser.add_argument('--embd_pdrop', type=float, default=0.1)

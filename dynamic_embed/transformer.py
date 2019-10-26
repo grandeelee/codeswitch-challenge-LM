@@ -70,9 +70,13 @@ class MultiHeadAttention(nn.Module):
 
     def __init__(self, dim, cfg):
         super(MultiHeadAttention, self).__init__()
-        assert dim % cfg.n_heads == 0
-        self.n_heads = cfg.n_heads
-        self.split_size = dim
+        if cfg.grow_dim:
+            assert dim % cfg.n_heads == 0
+            self.n_heads = cfg.n_heads
+            self.split_size = dim
+        if cfg.grow_head:
+            self.split_size = cfg.emsize
+            self.dim = dim
         self._attn = ScaledDotProductAttention(dropout=cfg.attn_pdrop)
         self.linear = Conv1D(dim, dim * 3)
         self.proj = Conv1D(dim, dim)
@@ -84,7 +88,7 @@ class MultiHeadAttention(nn.Module):
         return x.view(*new_x_shape)
 
     def split_heads(self, x, k=False):
-        new_x_shape = x.size()[:-1] + (self.n_heads, x.size(-1) // self.n_heads)
+        new_x_shape = x.size()[:-1] + (x.size(-2) // self.split_size, self.split_size)
         x = x.view(*new_x_shape)
         if k:
             # batch, heads, dim, n_seq
@@ -94,10 +98,10 @@ class MultiHeadAttention(nn.Module):
             return x.permute(0, 2, 1, 3)
 
     def forward(self, x):
-        assert x.size(-1) == self.split_size, 'input dimension disagree with model'
+        assert x.size(-1) % self.split_size == 0, 'input dimension disagree with model'
         # linearly transform x to k q v
         x = self.linear(x)
-        q, k, v = x.split(self.split_size, dim=2)
+        q, k, v = x.split(self.dim, dim=2)
         q = self.split_heads(q)
         k = self.split_heads(k, k=True)
         v = self.split_heads(v)
@@ -151,6 +155,8 @@ class Block(nn.Module):
         self.mlp = MLP(nx, cfg)
         self.ln_2 = LayerNorm(nx)
         self.proj = Conv1D(nx, cfg.emsize)
+        self.grow_dim = cfg.grow_dim
+        self.grow_head = cfg.grow_head
 
     def merge_heads(self, x):
         new_x_shape = x.size()[:-2] + (x.size(-2) * x.size(-1),)
@@ -168,7 +174,10 @@ class Block(nn.Module):
         h = self.proj(h)
         h = self.split_heads(h)
         j = self.split_heads(x)
-        h = torch.cat([j, h], dim=-1)
+        if self.grow_dim:
+            h = torch.cat([j, h], dim=-1)
+        if self.grow_head:
+            h = torch.cat([j, h], dim=-2)
         h = self.merge_heads(h)
         return h
 
