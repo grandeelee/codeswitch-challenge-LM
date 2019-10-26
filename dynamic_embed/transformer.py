@@ -163,7 +163,7 @@ class Block_reduce(nn.Module):
     def __init__(self, cfg, layer_id):
         super(Block_reduce, self).__init__()
         self.layer_id = layer_id
-        nx = cfg.emsize * self.layer_id
+        nx = cfg.emsize * (self.layer_id + 1)
         self.attn = MultiHeadAttention(nx, cfg)
         self.ln_1 = LayerNorm(nx)
         self.mlp = MLP(nx, cfg)
