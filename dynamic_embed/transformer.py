@@ -144,6 +144,7 @@ class Block(nn.Module):
     def __init__(self, cfg, layer_id):
         super(Block, self).__init__()
         self.layer_id = layer_id + 1
+        self.n_heads = cfg.n_heads
         nx = cfg.emsize * self.layer_id
         self.attn = MultiHeadAttention(nx, cfg)
         self.ln_1 = LayerNorm(nx)
@@ -151,17 +152,31 @@ class Block(nn.Module):
         self.ln_2 = LayerNorm(nx)
         self.proj = Conv1D(nx, cfg.emsize)
 
+    def merge_heads(self, x):
+        new_x_shape = x.size()[:-2] + (x.size(-2) * x.size(-1),)
+        return x.contiguous().view(*new_x_shape)
+
+    def split_heads(self, x):
+        new_x_shape = x.size()[:-1] + (self.n_heads, x.size(-1) // self.n_heads)
+        return x.view(*new_x_shape)
+
     def forward(self, x):
         a = self.attn(x)
         n = self.ln_1(x + a)  # or self.ln_1(a) + x
         m = self.mlp(n)
         h = self.ln_2(n + m)  # or self.ln_2(m) + n
         h = self.proj(h)
-        return torch.cat([x, h], dim=-1)
+        h = self.split_heads(h)
+        j = self.split_heads(x)
+        h = torch.cat([j, h], dim=-1)
+        h = self.merge_heads(h)
+        return h
 
-class Block_reduce(nn.Module):
+
+class BlockReduce(nn.Module):
+
     def __init__(self, cfg, layer_id):
-        super(Block_reduce, self).__init__()
+        super(BlockReduce, self).__init__()
         self.layer_id = layer_id
         nx = cfg.emsize * (self.layer_id + 1)
         self.attn = MultiHeadAttention(nx, cfg)
@@ -178,6 +193,7 @@ class Block_reduce(nn.Module):
         h = self.proj(h)
         return h
 
+
 class TransformerModel(nn.Module):
     """ Transformer model """
 
@@ -192,7 +208,7 @@ class TransformerModel(nn.Module):
         self.drop = cfg.embd_pdrop
         # block = Block(cfg)
         self.h = nn.ModuleList([copy.deepcopy(Block(cfg, i)) for i in range(cfg.nlayers)])
-        self.hr = nn.ModuleList([copy.deepcopy(Block_reduce(cfg, cfg.nlayers-i)) for i in range(cfg.nlayers)])
+        self.hr = nn.ModuleList([copy.deepcopy(BlockReduce(cfg, cfg.nlayers - i)) for i in range(cfg.nlayers)])
         self.lockdrop = LockedDropout(cfg.dropouti)
         nn.init.normal_(self.embed.weight, std=0.02)
 
