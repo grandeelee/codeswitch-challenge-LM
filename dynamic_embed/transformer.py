@@ -88,7 +88,7 @@ class MultiHeadAttention(nn.Module):
         return x.view(*new_x_shape)
 
     def split_heads(self, x, k=False):
-        new_x_shape = x.size()[:-1] + (x.size(-2) // self.split_size, self.split_size)
+        new_x_shape = x.size()[:-1] + (x.size(-1) // self.split_size, self.split_size)
         x = x.view(*new_x_shape)
         if k:
             # batch, heads, dim, n_seq
