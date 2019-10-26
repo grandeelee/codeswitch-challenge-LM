@@ -163,7 +163,7 @@ class Block(nn.Module):
         return x.contiguous().view(*new_x_shape)
 
     def split_heads(self, x):
-        new_x_shape = x.size()[:-1] + (self.n_heads, x.size(-1) // self.n_heads)
+        new_x_shape = x.size()[:-1] + (x.size(-1) // self.split_size, self.split_size)
         return x.view(*new_x_shape)
 
     def forward(self, x):
