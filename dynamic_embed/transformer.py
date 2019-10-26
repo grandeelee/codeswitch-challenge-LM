@@ -143,8 +143,8 @@ class Block(nn.Module):
 
     def __init__(self, cfg, layer_id):
         super(Block, self).__init__()
-        self.layer_id = layer_id
-        nx = cfg.emsize * (self.layer_id + 1)
+        self.layer_id = layer_id + 1
+        nx = cfg.emsize * self.layer_id
         self.attn = MultiHeadAttention(nx, cfg)
         self.ln_1 = LayerNorm(nx)
         self.mlp = MLP(nx, cfg)
@@ -159,6 +159,24 @@ class Block(nn.Module):
         h = self.proj(h)
         return torch.cat([x, h], dim=-1)
 
+class Block_reduce(nn.Module):
+    def __init__(self, cfg, layer_id):
+        super(Block_reduce, self).__init__()
+        self.layer_id = layer_id
+        nx = cfg.emsize * self.layer_id
+        self.attn = MultiHeadAttention(nx, cfg)
+        self.ln_1 = LayerNorm(nx)
+        self.mlp = MLP(nx, cfg)
+        self.ln_2 = LayerNorm(nx)
+        self.proj = Conv1D(nx, nx - cfg.emsize)
+
+    def forward(self, x):
+        a = self.attn(x)
+        n = self.ln_1(x + a)  # or self.ln_1(a) + x
+        m = self.mlp(n)
+        h = self.ln_2(n + m)  # or self.ln_2(m) + n
+        h = self.proj(h)
+        return h
 
 class TransformerModel(nn.Module):
     """ Transformer model """
@@ -174,6 +192,7 @@ class TransformerModel(nn.Module):
         self.drop = cfg.embd_pdrop
         # block = Block(cfg)
         self.h = nn.ModuleList([copy.deepcopy(Block(cfg, i)) for i in range(cfg.nlayers)])
+        self.hr = nn.ModuleList([copy.deepcopy(Block_reduce(cfg, cfg.nlayers-i)) for i in range(cfg.nlayers)])
         self.lockdrop = LockedDropout(cfg.dropouti)
         nn.init.normal_(self.embed.weight, std=0.02)
 
@@ -188,6 +207,8 @@ class TransformerModel(nn.Module):
         h = self.lockdrop(e)
         for block in self.h:
             h = block(h)
+        for block in self.hr:
+            h = block(h)
         return h
 
 
@@ -198,9 +219,9 @@ class LMModel(nn.Module):
         super(LMModel, self).__init__()
         assert vocab > 0
         self.transformer = TransformerModel(cfg, vocab=vocab)
-        # embed_shape = self.transformer.embed.weight.shape
-        self.decoder = nn.Linear(cfg.emsize * (cfg.nlayers + 1), vocab, bias=False)
-        # self.decoder.weight = self.transformer.embed.weight  # Tied weights
+        embed_shape = self.transformer.embed.weight.shape
+        self.decoder = nn.Linear(embed_shape[1], embed_shape[0], bias=False)
+        self.decoder.weight = self.transformer.embed.weight  # Tied weights
         self.return_probs = return_probs
         if self.return_probs:
             pos_emb_mask = torch.zeros(1, 1, vocab)
