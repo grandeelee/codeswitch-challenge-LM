@@ -6,7 +6,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='Transformer based Language Model')
     # directory
     parser.add_argument('--data', type=str, default='../data/penn/', help='location of the data corpus')
-    parser.add_argument('--model', type=str, default='../save/penn_untie', help='location of the model')
+    parser.add_argument('--model', type=str, default='../save/penn_tuning/penn_untie', help='location of the model')
 
     # model
     parser.add_argument('--pos_embed', type=bool, default=False, help='whether use position embedding')
