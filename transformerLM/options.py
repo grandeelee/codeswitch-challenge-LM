@@ -6,7 +6,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='Transformer based Language Model')
     # directory
     parser.add_argument('--data', type=str, default='../data/penn/', help='location of the data corpus')
-    parser.add_argument('--model', type=str, default='../save/penn_run_2', help='location of the model')
+    parser.add_argument('--model', type=str, default='../save/penn_untie', help='location of the model')
 
     # model
     parser.add_argument('--pos_embed', type=bool, default=False, help='whether use position embedding')
@@ -14,7 +14,7 @@ def get_args():
     parser.add_argument('--n_ctx', type=int, default=100, help='sequence length')
     parser.add_argument('--n_heads', type=int, default=12)
     parser.add_argument('--nlayers', type=int, default=12, help='number of layers')
-    parser.add_argument('--tied', action='store_true', help='tie the word embedding and softmax weights')
+    parser.add_argument('--tied', type=bool, default=False, help='tie the word embedding and softmax weights')
 
     # optimization
     parser.add_argument('--embd_pdrop', type=float, default=0.1)

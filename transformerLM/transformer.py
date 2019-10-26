@@ -215,7 +215,8 @@ class LMModel(nn.Module):
 		self.transformer = TransformerModel(cfg, vocab=vocab, n_seq=n_ctx)
 		embed_shape = self.transformer.embed.weight.shape
 		self.decoder = nn.Linear(embed_shape[1], embed_shape[0], bias=False)
-		self.decoder.weight = self.transformer.embed.weight  # Tied weights
+		if cfg.tied:
+			self.decoder.weight = self.transformer.embed.weight  # Tied weights
 		self.return_probs = return_probs
 		if self.return_probs:
 			pos_emb_mask = torch.zeros(1, 1, vocab)
