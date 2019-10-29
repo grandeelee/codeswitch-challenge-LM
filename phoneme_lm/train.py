@@ -53,7 +53,7 @@ def get_iterator(iter_name, data_set):
 
     iterator = data[iter_name][data_set].get_iterator(
         shuffle=True,
-        group_by_size=True,
+        group_by_size=False,
     )
 
     iterators[(iter_name, data_set)] = iterator

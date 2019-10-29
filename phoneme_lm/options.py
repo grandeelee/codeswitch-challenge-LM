@@ -11,7 +11,7 @@ def get_args():
     # model
     parser.add_argument('--pos_embed', type=bool, default=False, help='whether use position embedding')
     parser.add_argument('--emsize', type=int, default=384, help='size of word embeddings')
-    parser.add_argument('--n_ctx', type=int, default=256, help='sequence length')
+    parser.add_argument('--n_ctx', type=int, default=200, help='sequence length')
     parser.add_argument('--n_heads', type=int, default=12)
     parser.add_argument('--nlayers', type=int, default=12, help='number of layers')
     parser.add_argument('--tied', action='store_true', help='tie the word embedding and softmax weights')
@@ -37,8 +37,8 @@ def get_args():
     parser.add_argument('--e', type=float, default=1e-8)
 
     # training
-    parser.add_argument('--gpus', type=str, default='1')
-    parser.add_argument('--epochs', type=int, default=200, help='upper epoch limit')
+    parser.add_argument('--gpus', type=str, default='2')
+    parser.add_argument('--epochs', type=int, default=300, help='upper epoch limit')
     parser.add_argument('--epoch_size', type=int, default=100000, help='epoch size')
     parser.add_argument('--batch_size', type=int, default=30, metavar='N', help='batch size')
     parser.add_argument('--seed', type=int, default=1111, help='random seed')
@@ -49,7 +49,7 @@ def get_args():
     # dataset
     parser.add_argument('--max_vocab', type=int, default=-1)
     parser.add_argument('--min_count', type=int, default=0)
-    parser.add_argument('--max_len', type=int, default=254)
+    parser.add_argument('--max_len', type=int, default=198)
     parser.add_argument('--unk_tol', type=float, default=0.2, help='tolerance to percentage of unk token')
 
     return parser.parse_args()
