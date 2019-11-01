@@ -82,7 +82,7 @@ def get_batch(iter_name, data_set):
 model = LMModel(args, args.vocab_size, args.n_ctx)
 criterion = nn.CrossEntropyLoss(reduction='none')
 
-n_updates_total = args.epoch_size * args.epochs
+n_updates_total = args.epoch_size * 2 * args.epochs
 model_opt = OpenAIAdam(model.parameters(),
                        lr=args.lr,
                        schedule=args.lr_schedule,
@@ -132,9 +132,8 @@ def evaluate(generator):
 def run_epoch(data_name, dataset_split):
     total_loss = 0
     start_time = time.time()
-    batch = 0
     n_words = 0
-    for _ in tqdm(range(args.epoch_size), ncols=100):
+    for batch in tqdm(range(args.epoch_size), ncols=100):
         x, lengths = get_batch(data_name, dataset_split)
         alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
         # -1 minus away the bos index, target is the sent and </s>
@@ -172,7 +171,6 @@ def run_epoch(data_name, dataset_split):
             total_loss = 0
             n_words = 0
             start_time = time.time()
-        batch += 1
 
 
 if __name__ == '__main__':

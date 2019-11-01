@@ -6,7 +6,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='Transformer based Language Model')
     # directory
     parser.add_argument('--data', type=str, default='../data/phoneme_lm/', help='location of the data corpus')
-    parser.add_argument('--model', type=str, default='../save/phoneme/basic', help='location of the model')
+    parser.add_argument('--model', type=str, default='../save/phoneme/phonemeLM', help='location of the model')
 
     # model
     parser.add_argument('--pos_embed', type=bool, default=False, help='whether use position embedding')
@@ -38,9 +38,9 @@ def get_args():
 
     # training
     parser.add_argument('--gpus', type=str, default='2')
-    parser.add_argument('--epochs', type=int, default=300, help='upper epoch limit')
-    parser.add_argument('--epoch_size', type=int, default=100000, help='epoch size')
-    parser.add_argument('--batch_size', type=int, default=30, metavar='N', help='batch size')
+    parser.add_argument('--epochs', type=int, default=100, help='upper epoch limit')
+    parser.add_argument('--epoch_size', type=int, default=10000, help='epoch size')
+    parser.add_argument('--batch_size', type=int, default=20, metavar='N', help='batch size')
     parser.add_argument('--seed', type=int, default=1111, help='random seed')
     parser.add_argument('--tokens_per_batch', type=int, default=-1)
     parser.add_argument('--resume', type=str, default='', help='path of model to resume')
