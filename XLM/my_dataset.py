@@ -159,7 +159,7 @@ class Dataset(object):
         """
         Return a sentences iterator.
         """
-        assert direction in ['forward', 'backward'], 'direction can only be forward or backward'
+        assert direction in ['forward', 'backward'], direction
         n_sentences = len(self.pos)
         assert type(shuffle) is bool and type(group_by_size) is bool
 
