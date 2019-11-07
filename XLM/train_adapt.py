@@ -219,7 +219,7 @@ def run_adapt_epoch(iter_name, data_set):
     n_words = 0
     epoch_size = len(data[iter_name][data_set]) // args.batch_size + 1
     for batch in tqdm(range(epoch_size), ncols=100):
-        for direction in ['forward']:
+        for direction in args.directions:
             # generate batch
             x, lengths = get_batch(iter_name, data_set, direction)
             # for sent in x:
