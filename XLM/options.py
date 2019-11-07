@@ -5,7 +5,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='Transformer based Language Model')
     # directory
     parser.add_argument('--data', type=str, default='../data/cs_para/', help='location of the data corpus')
-    parser.add_argument('--model', type=str, default='../save/xlm_baseline_mix_deeper', help='location of the model')
+    parser.add_argument('--model', type=str, default='../save/xlm_baseline_mix_deeper_bi', help='location of the model')
 
     # model
     parser.add_argument('--pos_embed', type=bool, default=False, help='whether use position embedding')
@@ -14,7 +14,7 @@ def get_args():
     parser.add_argument('--n_heads', type=int, default=12)
     parser.add_argument('--nlayers', type=int, default=24, help='number of layers')
     parser.add_argument('--tied', action='store_true', help='tie the word embedding and softmax weights')
-    parser.add_argument('--directions', type=list, default=['forward'])
+    parser.add_argument('--directions', type=list, default=['forward', 'backward'])
 
     # optimization
     parser.add_argument('--embd_pdrop', type=float, default=0.1)
