@@ -96,6 +96,29 @@ model.to(device)
 model.eval()
 
 
+def getMask(dict_path):
+    """
+    compare vocab in dict_path with data['dictionary'], return the words in dict_path as true, else false
+    :param dict_path: the dictionary path containing a list of vocab
+    :return: boolen of size [vocab,]
+    """
+    with open(dict_path, 'r', encoding='utf-8') as f:
+        target_vocab = f.read().split()
+    vocab_mask = torch.empty((len(dico)), dtype=torch.bool)
+
+
+def maskLogits(logits, vocab_mask):
+    """
+    add -1e12 to logits whose index need to be masked in calculating the vocab
+    :param logits: of size [n, vocab]
+    :return: size [n, vocab]
+    """
+    # assume already have the mask of true, false with size vocab
+    assert logits.dim() == 2, 'logit dim expect 2 but not 2, cannot apply vocab mask'
+    logits[:, vocab_mask] = -1e12
+    return logits
+
+
 def evaluate(generator):
     # Turn on evaluation mode which disables dropout.
     total_loss = 0

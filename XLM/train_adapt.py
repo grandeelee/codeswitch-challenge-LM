@@ -45,7 +45,7 @@ logger.info('------------------------------------------------')
 iterators = {}
 
 
-def get_iterator(iter_name, data_set, direction=args.directions):
+def get_iterator(iter_name, data_set, direction='forward'):
     """
     Create a new iterator for a dataset.
     """
@@ -62,7 +62,7 @@ def get_iterator(iter_name, data_set, direction=args.directions):
     return iterator
 
 
-def get_batch(iter_name, data_set, direction=args.directions):
+def get_batch(iter_name, data_set, direction='forward'):
     """
     Return a batch of sentences from a dataset.
     iter_name : causal
