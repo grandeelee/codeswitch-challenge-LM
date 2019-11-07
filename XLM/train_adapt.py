@@ -36,6 +36,10 @@ data = load_data(args)
 args.log_interval = 1000
 args.vocab_size = len(data['dictionary'])
 assert args.max_len + 2 <= args.n_ctx, 'sequence length cannot accommodate max sent length'
+if args.bidirectional:
+    args.directions = ['forward', 'backward']
+else:
+    args.directions = ['forward']
 
 logger.info('------------------------------------------------')
 for key, value in vars(args).items():
@@ -261,7 +265,7 @@ def run_adapt_epoch(iter_name, data_set):
 
 
 if __name__ == '__main__':
-    model = LMModel(args, args.vocab_size, args.n_ctx)
+    model = LMModel(args, args.vocab_size)
     criterion = nn.CrossEntropyLoss(reduction='none')
 
     n_updates_total = args.epoch_size * 2 * args.epochs * len(args.directions)

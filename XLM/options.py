@@ -14,7 +14,7 @@ def get_args():
     parser.add_argument('--n_heads', type=int, default=12)
     parser.add_argument('--nlayers', type=int, default=24, help='number of layers')
     parser.add_argument('--tied', action='store_true', help='tie the word embedding and softmax weights')
-    parser.add_argument('--directions', type=list, default=['forward', 'backward'])
+    parser.add_argument('--bidirectional', action='store_true')
 
     # optimization
     parser.add_argument('--embd_pdrop', type=float, default=0.1)
