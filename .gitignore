@@ -5,3 +5,5 @@ data/
 save/
 transformerLM/__pycache__/
 transformerLM_in/__pycache__/
+/language-style-transfer/data/
+/language-style-transfer/img/

@@ -45,7 +45,7 @@ logger.info('------------------------------------------------')
 iterators = {}
 
 
-def get_iterator(iter_name, data_set, direction='forward'):
+def get_iterator(iter_name, data_set, direction=args.directions):
     """
     Create a new iterator for a dataset.
     """
@@ -62,7 +62,7 @@ def get_iterator(iter_name, data_set, direction='forward'):
     return iterator
 
 
-def get_batch(iter_name, data_set, direction='forward'):
+def get_batch(iter_name, data_set, direction=args.directions):
     """
     Return a batch of sentences from a dataset.
     iter_name : causal
@@ -133,7 +133,7 @@ def run_epoch():
     epoch_size = args.epoch_size
 
     for batch in tqdm(range(epoch_size), ncols=100):
-        for direction in ['forward', 'backward']:
+        for direction in args.directions:
             # generate batch
             x, lengths = get_batch('train', ('en', 'zh'), direction)
 
@@ -215,7 +215,7 @@ def run_adapt_epoch(iter_name, data_set):
     n_words = 0
     epoch_size = len(data[iter_name][data_set]) // args.batch_size + 1
     for batch in tqdm(range(epoch_size), ncols=100):
-        for direction in ['forward', 'backward']:
+        for direction in ['forward']:
             # generate batch
             x, lengths = get_batch(iter_name, data_set, direction)
             # for sent in x:
@@ -264,7 +264,7 @@ if __name__ == '__main__':
     model = LMModel(args, args.vocab_size, args.n_ctx)
     criterion = nn.CrossEntropyLoss(reduction='none')
 
-    n_updates_total = (len(data['train'][('en', 'zh')]) * 4 // args.batch_size) * args.epochs
+    n_updates_total = args.epoch_size * 2 * args.epochs * len(args.directions)
     model_opt = OpenAIAdam(model.parameters(),
                            lr=args.lr,
                            schedule=args.lr_schedule,
@@ -337,7 +337,7 @@ if __name__ == '__main__':
                     test_loss, math.exp(test_loss)))
                 logger.debug('=' * 89)
 
-            if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
+            if len(best_val_loss) > 17 and val_loss > min(best_val_loss[:-5]):
                 logger.info('Early stop')
                 break
 
@@ -345,7 +345,7 @@ if __name__ == '__main__':
 
         # adaptation
         model.load_state_dict(torch.load(args.model + '_valid.pt'))
-        n_updates_total = (len(data['cs']['adapt']) * 2 // args.batch_size) * 7
+        n_updates_total = (len(data['cs']['adapt']) // args.batch_size) * 7
         model_opt = OpenAIAdam(model.parameters(),
                                lr=args.lr,
                                schedule=args.lr_schedule,

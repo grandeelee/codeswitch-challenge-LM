@@ -14,7 +14,7 @@ from opt import OpenAIAdam
 from my_loader_newsplit import load_mono_data, check_data_params
 
 args = get_args()
-args.model = '../save/xlm_run_2'
+args.model = '../save/bi_directional/xlm_baseline_mix_bi_nostop_valid'
 # ================= initialization ========================
 logger = create_logger(args.model + '_eval.log')
 
@@ -31,8 +31,9 @@ logger.info("device: {} n_gpu: {}".format(device, n_gpu))
 
 # ============== data set preparation ======================
 args.batch_size = 50
-# args.n_ctx = 35
-# args.max_len = 33
+args.n_ctx = 70
+args.max_len = 68
+args.gpus = '1'
 check_data_params(args)
 
 # load data
@@ -149,7 +150,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     return logits
 
 
-def sample_sequence(args, model, length, temperature=1.0, top_k=20, top_p=0.0):
+def sample_sequence(args, model, length, temperature=1000, top_k=20, top_p=0.0):
     bos_idx = dico.word2id['<s>']
     context = torch.full((args.batch_size, 1), bos_idx, dtype=torch.long).to(device)
     with torch.no_grad():
@@ -164,39 +165,40 @@ def sample_sequence(args, model, length, temperature=1.0, top_k=20, top_p=0.0):
 
 if __name__ == '__main__':
     # Run on test data.
-    test_iterator = get_iterator('cs', 'test')
-    test_loss = evaluate(test_iterator)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-    # Run on test data.
-    test_iterator = get_iterator('cs', 'test_cs')
-    test_loss = evaluate(test_iterator)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-    # Run on test data.
-    test_iterator = get_iterator('cs', 'test_en')
-    test_loss = evaluate(test_iterator)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-    # Run on test data.
-    test_iterator = get_iterator('cs', 'test_zh')
-    test_loss = evaluate(test_iterator)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
+    # test_iterator = get_iterator('cs', 'test')
+    # test_loss = evaluate(test_iterator)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    # # Run on test data.
+    # test_iterator = get_iterator('cs', 'test_cs')
+    # test_loss = evaluate(test_iterator)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    # # Run on test data.
+    # test_iterator = get_iterator('cs', 'test_en')
+    # test_loss = evaluate(test_iterator)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    # # Run on test data.
+    # test_iterator = get_iterator('cs', 'test_zh')
+    # test_loss = evaluate(test_iterator)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
 
-    generated = sample_sequence(args, model, args.n_ctx)
-    generated = generated.cpu().numpy()
-    generated_word = []
-    for l in generated:
-        for x in l:
-            generated_word.append(dico.id2word[x])
-        generated_word.append('\n')
-    logger.debug(' '.join(generated_word))
+    for temp in [0.1, 1, 10, 100, 1000]:
+        generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
+        generated = generated.cpu().numpy()
+        generated_word = []
+        for l in generated:
+            for x in l:
+                generated_word.append(dico.id2word[x])
+            generated_word.append('\n')
+        logger.debug(' '.join(generated_word))
