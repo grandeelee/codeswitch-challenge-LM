@@ -54,8 +54,8 @@ class ScaledDotProductAttention(nn.Module):
         self.dropout = MaskDropout(dropout)  # nn.Dropout(dropout)  # may try use variational dropout
         # self.register_buffer("mask", torch.tril(torch.ones(n_seq, n_seq).view(1, 1, n_seq, n_seq)))
 
-    def forward(self, q, k, v):
-        s_len = q.size(-2)
+    def forward(self, q, k, v, idx, weight, attn_forcing):  # idx is 1d array of the length of source lan
+        n, _, s_len, _ = q.size()
         alen = torch.arange(s_len, dtype=torch.long, device=q.device)
         mask = alen[None, :] <= alen[:, None]
         mask = mask.float().unsqueeze(0).unsqueeze(0)
@@ -63,6 +63,12 @@ class ScaledDotProductAttention(nn.Module):
         w = w / math.sqrt(v.size(-1))
         w = w * mask + -1e9 * (1 - mask)
         w = nn.Softmax(dim=-1)(w)
+        if attn_forcing:
+            assert idx.size(0) == n, 'idx dim is {} not equal to batch size {}'.format(idx.size(0), n)
+            a = (alen[None, :] >= idx[:, None]).float() * weight + (alen[None, :] < idx[:, None]).float()
+            a = a.unsqueeze(1).unsqueeze(1)
+            w = w * a
+            w = w / torch.sum(w, dim=-1, keepdim=True)
         w = self.dropout(w)
         return torch.matmul(w, v)
 
@@ -93,14 +99,14 @@ class MultiHeadAttention(nn.Module):
             # batch, heads, n_seq, dim
             return x.permute(0, 2, 1, 3)
 
-    def forward(self, x):
+    def forward(self, x, idx, weight, attn_forcing):
         # linearly transform x to k q v
         x = self.linear(x)
         q, k, v = x.split(self.split_size, dim=2)
         q = self.split_heads(q)
         k = self.split_heads(k, k=True)
         v = self.split_heads(v)
-        a = self._attn(q, k, v)
+        a = self._attn(q, k, v, idx, weight, attn_forcing)
         a = self.merge_heads(a)
         a = self.proj(a)
         # use variational dropout? like LSTM regularization.
@@ -148,8 +154,8 @@ class Block(nn.Module):
         self.mlp = MLP(4 * nx, cfg)
         self.ln_2 = LayerNorm(nx)
 
-    def forward(self, x):
-        a = self.attn(x)
+    def forward(self, x, idx, weight, attn_forcing):
+        a = self.attn(x, idx, weight, attn_forcing)
         n = self.ln_1(x + a)  # or self.ln_1(a) + x
         m = self.mlp(n)
         h = self.ln_2(n + m)  # or self.ln_2(m) + n
@@ -163,6 +169,8 @@ class TransformerModel(nn.Module):
         super(TransformerModel, self).__init__()
         self.use_pos = cfg.pos_embed
         self.vocab = vocab
+        self.attn_weight = 1.0
+        self.attn_forcing = True
         self.embed = nn.Embedding(vocab, cfg.emsize)
         self.pos_embed = nn.Embedding(cfg.n_ctx, cfg.emsize)
         #  dropout try LSTM regularize paper
@@ -174,7 +182,7 @@ class TransformerModel(nn.Module):
         nn.init.normal_(self.embed.weight, std=0.02)
 
     def forward(self, x):
-
+        idx = (x == 0).nonzero()[:, 1]
         e = embedded_dropout(self.embed, x, dropout=self.drop if self.training else 0)
         # Add the position information to the input embeddings
         if self.use_pos:
@@ -183,7 +191,7 @@ class TransformerModel(nn.Module):
             e = e + p
         h = self.lockdrop(e)
         for block in self.h:
-            h = block(h)
+            h = block(h, idx, self.attn_weight, self.attn_forcing)
         return h
 
 

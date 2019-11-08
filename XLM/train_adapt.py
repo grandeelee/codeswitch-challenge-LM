@@ -290,13 +290,19 @@ if __name__ == '__main__':
 
     best_val_loss = []
     stored_loss = 100000000
-
     # At any point you can hit Ctrl + C to break out of training early.
     try:
         for epoch in range(args.epochs):
             epoch_start_time = time.time()
+            if args.attn_forcing == 'decreasing':
+                logger.info("decreasing attention weights for attention forcing")
+                model.transformer.attn_weight = max(0.0, 0.5 - epoch * (0.5 / 20))
+            elif args.attn_forcing == 'increasing':
+                logger.info("increasing attention weights for attention forcing")
+                model.transformer.attn_weight = min(1.0, 0.0 + epoch * (0.5 / 20))
             run_epoch()
             valid_iterator = get_iterator('cs', 'valid')
+            model.transformer.attn_forcing = False
             val_loss = evaluate(valid_iterator)
             logger.info('-' * 89)
             logger.info('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
@@ -362,6 +368,7 @@ if __name__ == '__main__':
                                vector_l2=args.vector_l2,
                                max_grad_norm=args.max_grad_norm)
         best_val_loss = []
+        model.transformer.attn_forcing = False
         for epoch in range(7):
             epoch_start_time = time.time()
             run_adapt_epoch('cs', 'adapt')

@@ -5,7 +5,7 @@ def get_args():
     parser = argparse.ArgumentParser(description='Transformer based Language Model')
     # directory
     parser.add_argument('--data', type=str, default='../data/cs_para/', help='location of the data corpus')
-    parser.add_argument('--model', type=str, default='../save/xlm_baseline_mix_deeper_bi', help='location of the model')
+    parser.add_argument('--model', type=str, default='../save/test', help='location of the model')
 
     # model
     parser.add_argument('--pos_embed', type=bool, default=False, help='whether use position embedding')
@@ -45,6 +45,7 @@ def get_args():
     parser.add_argument('--tokens_per_batch', type=int, default=-1)
     parser.add_argument('--resume', type=str, default='', help='path of model to resume')
     parser.add_argument('--optimizer', type=str, default='adam', help='optimizer to use (sgd, adam)')
+    parser.add_argument('--attn_forcing', type=str, default='decreasing')
 
     # dataset
     parser.add_argument('--max_vocab', type=int, default=50000)
