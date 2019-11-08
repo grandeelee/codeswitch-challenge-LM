@@ -216,7 +216,7 @@ if __name__ == '__main__':
     #     test_loss, math.exp(test_loss)))
     # logger.debug('=' * 89)
 
-    for temp in [0.1, 1, 10, 100, 1000]:
+    for temp in [0.1, 0.7, 1, 10, 100]:
         generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
         generated = generated.cpu().numpy()
         generated_word = []
