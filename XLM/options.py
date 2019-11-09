@@ -39,7 +39,7 @@ def get_args():
     # training
     parser.add_argument('--gpus', type=str, default='1')
     parser.add_argument('--epochs', type=int, default=200, help='upper epoch limit')
-    parser.add_argument('--epoch_size', type=int, default=10000, help='epoch size')
+    parser.add_argument('--sent_per_epoch', type=int, default=100000, help='no of sents to process per epoch')
     parser.add_argument('--batch_size', type=int, default=20, metavar='N', help='batch size')
     parser.add_argument('--seed', type=int, default=1111, help='random seed')
     parser.add_argument('--tokens_per_batch', type=int, default=-1)

@@ -31,10 +31,11 @@ logger.info("device: {} n_gpu: {}".format(device, n_gpu))
 
 # ============== data set preparation ======================
 args.batch_size = args.batch_size * max(n_gpu, 1)
+args.epoch_size = args.sent_per_epoch // args.batch_size
+args.log_interval = args.epoch_size // 10
 check_data_params(args)
 # load data
 data = load_data(args)
-args.log_interval = 1000
 args.vocab_size = len(data['dictionary'])
 assert args.max_len + 2 <= args.n_ctx, 'sequence length cannot accommodate max sent length'
 if args.bidirectional:
@@ -344,12 +345,20 @@ if __name__ == '__main__':
     try:
         for epoch in range(epoch_start, args.epochs):
             epoch_start_time = time.time()
+            assert args.attn_forcing in ['decreasing', 'increasing', 'constant', 'None'], \
+                'unexpected entry for attn_forcing: [}'.format(args.attn_forcing)
             if args.attn_forcing == 'decreasing':
                 logger.info("decreasing attention weights for attention forcing")
                 model.transformer.attn_weight = max(0.0, 0.5 - epoch * (0.5 / 20))
             elif args.attn_forcing == 'increasing':
                 logger.info("increasing attention weights for attention forcing")
                 model.transformer.attn_weight = min(1.0, 0.0 + epoch * (0.5 / 30))
+            elif args.attn_forcing == 'constant':
+                logger.info('set attention weights for attention forcing to be zero')
+                model.transformer.attn_weight = 0.0
+            elif args.attn_forcing == 'None':
+                logger.info('No attention forcing is used')
+                model.transformer.attn_forcing = False
             run_epoch()
             valid_iterator = get_iterator('cs', 'valid')
             model.transformer.attn_forcing = False
