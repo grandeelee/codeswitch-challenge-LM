@@ -334,9 +334,15 @@ if __name__ == '__main__':
 
     best_val_loss = []
     stored_loss = 100000000
+    epoch_start = 0
+    if args.resume_train:
+        # epoch_start = 0
+        logger.info('resume training from epoch: {}'.format(epoch_start))
+        logger.info('loading model from {}'.format(args.model + '_train.pt'))
+        model.load_state_dict(torch.load(args.model + '_train.pt'))
     # At any point you can hit Ctrl + C to break out of training early.
     try:
-        for epoch in range(args.epochs):
+        for epoch in range(epoch_start, args.epochs):
             epoch_start_time = time.time()
             if args.attn_forcing == 'decreasing':
                 logger.info("decreasing attention weights for attention forcing")
