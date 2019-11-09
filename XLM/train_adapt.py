@@ -336,8 +336,8 @@ if __name__ == '__main__':
     best_val_loss = []
     stored_loss = 100000000
     epoch_start = 0
-    if args.resume_train:
-        # epoch_start = 0
+    if args.resume_train > 0:
+        epoch_start = args.resume_train
         logger.info('resume training from epoch: {}'.format(epoch_start))
         logger.info('loading model from {}'.format(args.model + '_train.pt'))
         model.load_state_dict(torch.load(args.model + '_train.pt'))

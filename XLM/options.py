@@ -43,7 +43,7 @@ def get_args():
     parser.add_argument('--batch_size', type=int, default=20, metavar='N', help='batch size')
     parser.add_argument('--seed', type=int, default=1111, help='random seed')
     parser.add_argument('--tokens_per_batch', type=int, default=-1)
-    parser.add_argument('--resume_train', action='store_true', help='resume training, remember to set epoch')
+    parser.add_argument('--resume_train', type=int, default=-1, help='resume training, remember to set epoch')
     parser.add_argument('--optimizer', type=str, default='adam', help='optimizer to use (sgd, adam)')
     parser.add_argument('--attn_forcing', type=str, default='decreasing')
 
