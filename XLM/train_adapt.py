@@ -343,7 +343,7 @@ if __name__ == '__main__':
                 model.transformer.attn_weight = max(0.0, 0.5 - epoch * (0.5 / 20))
             elif args.attn_forcing == 'increasing':
                 logger.info("increasing attention weights for attention forcing")
-                model.transformer.attn_weight = min(1.0, 0.0 + epoch * (0.5 / 20))
+                model.transformer.attn_weight = min(1.0, 0.0 + epoch * (0.5 / 30))
             run_epoch()
             valid_iterator = get_iterator('cs', 'valid')
             model.transformer.attn_forcing = False
