@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 python train_adapt.py --gpus 2 --model ../save/xlm_baseline_mix_attn_none_schedule --nlayers 12 \
-                      --attn_forcing None --batch_size 50 --epoches 60 --adapt_epochs 11
+                      --attn_forcing None --batch_size 50 --epochs 60 --adapt_epochs 11
