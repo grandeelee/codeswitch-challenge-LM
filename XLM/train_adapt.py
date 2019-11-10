@@ -265,6 +265,7 @@ def run_adapt_epoch(iter_name, data_set):
             n_words = 0
             start_time = time.time()
 
+
 def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
     """ Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
         Args:
@@ -347,12 +348,13 @@ if __name__ == '__main__':
             epoch_start_time = time.time()
             assert args.attn_forcing in ['decreasing', 'increasing', 'constant', 'None'], \
                 'unexpected entry for attn_forcing: [}'.format(args.attn_forcing)
+            model.transformer.attn_forcing = True
             if args.attn_forcing == 'decreasing':
                 logger.info("decreasing attention weights for attention forcing")
-                model.transformer.attn_weight = max(0.0, 0.5 - epoch * (0.5 / 20))
+                model.transformer.attn_weight = max(0.0, 0.5 - epoch * (0.5 / 23))
             elif args.attn_forcing == 'increasing':
                 logger.info("increasing attention weights for attention forcing")
-                model.transformer.attn_weight = min(1.0, 0.0 + epoch * (0.5 / 30))
+                model.transformer.attn_weight = max(0.0, 0.0 + (epoch - 6) * (0.5 / 23))
             elif args.attn_forcing == 'constant':
                 logger.info('set attention weights for attention forcing to be zero')
                 model.transformer.attn_weight = 0.0
@@ -372,7 +374,7 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), args.model + '_train.pt')
             logger.info('Saving model')
 
-            for temp in [0.1, 0.7, 1, 10, 100]:
+            for temp in [0.7, 1, 10, 100]:
                 generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
                 generated = generated.cpu().numpy()
                 generated_word = []
@@ -416,15 +418,15 @@ if __name__ == '__main__':
                     test_loss, math.exp(test_loss)))
                 logger.debug('=' * 89)
 
-            if len(best_val_loss) > 17 and val_loss > min(best_val_loss[:-5]):
-                logger.info('Early stop')
-                break
+            # if len(best_val_loss) > 17 and val_loss > min(best_val_loss[:-5]):
+            #     logger.info('Early stop')
+            #     break
 
             best_val_loss.append(val_loss)
 
-        # adaptation
-        model.load_state_dict(torch.load(args.model + '_valid.pt'))
-        n_updates_total = (len(data['cs']['adapt']) // args.batch_size) * 7
+        # adaptation using train
+        model.load_state_dict(torch.load(args.model + '_train.pt'))
+        n_updates_total = (len(data['cs']['adapt']) // args.batch_size) * args.adapt_epochs
         model_opt = OpenAIAdam(model.parameters(),
                                lr=args.lr,
                                schedule=args.lr_schedule,
@@ -438,7 +440,7 @@ if __name__ == '__main__':
                                max_grad_norm=args.max_grad_norm)
         best_val_loss = []
         model.transformer.attn_forcing = False
-        for epoch in range(7):
+        for epoch in range(args.adapt_epochs):
             epoch_start_time = time.time()
             run_adapt_epoch('cs', 'adapt')
             valid_iterator = get_iterator('cs', 'valid')
@@ -449,7 +451,7 @@ if __name__ == '__main__':
                 epoch, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
             logger.info('-' * 89)
 
-            for temp in [0.1, 0.7, 1, 10, 100]:
+            for temp in [0.7, 1, 10, 100]:
                 generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
                 generated = generated.cpu().numpy()
                 generated_word = []
@@ -460,7 +462,7 @@ if __name__ == '__main__':
                 logger.debug(' '.join(generated_word))
 
             if val_loss < stored_loss:
-                torch.save(model.state_dict(), args.model + '_adapt.pt')
+                torch.save(model.state_dict(), args.model + '_train_adapt.pt')
                 logger.info('Saving model (new best validation)')
                 stored_loss = val_loss
                 # Run on test data.
@@ -492,9 +494,85 @@ if __name__ == '__main__':
                     test_loss, math.exp(test_loss)))
                 logger.debug('=' * 89)
 
-            if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
-                logger.info('Early stop')
-                break
+            # if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
+            #     logger.info('Early stop')
+            #     break
+
+            best_val_loss.append(val_loss)
+
+        # adaptation using valid
+        model.load_state_dict(torch.load(args.model + '_valid.pt'))
+        n_updates_total = (len(data['cs']['adapt']) // args.batch_size) * args.adapt_epochs
+        model_opt = OpenAIAdam(model.parameters(),
+                               lr=args.lr,
+                               schedule=args.lr_schedule,
+                               warmup=args.lr_warmup,
+                               t_total=n_updates_total,
+                               b1=args.b1,
+                               b2=args.b2,
+                               e=args.e,
+                               l2=args.l2,
+                               vector_l2=args.vector_l2,
+                               max_grad_norm=args.max_grad_norm)
+        best_val_loss = []
+        model.transformer.attn_forcing = False
+        for epoch in range(args.adapt_epochs):
+            epoch_start_time = time.time()
+            run_adapt_epoch('cs', 'adapt')
+            valid_iterator = get_iterator('cs', 'valid')
+            val_loss = evaluate(valid_iterator)
+            logger.info('-' * 89)
+            logger.info('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
+                        'valid ppl {:8.2f} |'.format(
+                epoch, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
+            logger.info('-' * 89)
+
+            for temp in [0.7, 1, 10, 100]:
+                generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
+                generated = generated.cpu().numpy()
+                generated_word = []
+                for l in generated:
+                    for x in l:
+                        generated_word.append(data['dictionary'].id2word[x])
+                    generated_word.append('\n')
+                logger.debug(' '.join(generated_word))
+
+            if val_loss < stored_loss:
+                torch.save(model.state_dict(), args.model + '_valid_adapt.pt')
+                logger.info('Saving model (new best validation)')
+                stored_loss = val_loss
+                # Run on test data.
+                test_iterator = get_iterator('cs', 'test')
+                test_loss = evaluate(test_iterator)
+                logger.debug('=' * 89)
+                logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+                    test_loss, math.exp(test_loss)))
+                logger.debug('=' * 89)
+                # Run on test data.
+                test_iterator = get_iterator('cs', 'test_cs')
+                test_loss = evaluate(test_iterator)
+                logger.debug('=' * 89)
+                logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+                    test_loss, math.exp(test_loss)))
+                logger.debug('=' * 89)
+                # Run on test data.
+                test_iterator = get_iterator('cs', 'test_en')
+                test_loss = evaluate(test_iterator)
+                logger.debug('=' * 89)
+                logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+                    test_loss, math.exp(test_loss)))
+                logger.debug('=' * 89)
+                # Run on test data.
+                test_iterator = get_iterator('cs', 'test_zh')
+                test_loss = evaluate(test_iterator)
+                logger.debug('=' * 89)
+                logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+                    test_loss, math.exp(test_loss)))
+                logger.debug('=' * 89)
+
+            # if len(best_val_loss) > 6 and val_loss > min(best_val_loss[:-5]):
+            #     logger.info('Early stop')
+            #     break
 
             best_val_loss.append(val_loss)
 
@@ -503,7 +581,18 @@ if __name__ == '__main__':
         logger.info('Exiting from training early')
 
     # Load the best saved model.
-    model.load_state_dict(torch.load(args.model + '_adapt.pt'))
+    model.load_state_dict(torch.load(args.model + '_train_adapt.pt'))
+
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test')
+    test_loss = evaluate(test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+
+    # Load the best saved model.
+    model.load_state_dict(torch.load(args.model + '_valid_adapt.pt'))
 
     # Run on test data.
     test_iterator = get_iterator('cs', 'test')

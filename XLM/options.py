@@ -38,7 +38,7 @@ def get_args():
 
     # training
     parser.add_argument('--gpus', type=str, default='1')
-    parser.add_argument('--epochs', type=int, default=200, help='upper epoch limit')
+    parser.add_argument('--epochs', type=int, default=30, help='upper epoch limit')
     parser.add_argument('--sent_per_epoch', type=int, default=100000, help='no of sents to process per epoch')
     parser.add_argument('--batch_size', type=int, default=20, metavar='N', help='batch size')
     parser.add_argument('--seed', type=int, default=1111, help='random seed')
@@ -46,6 +46,7 @@ def get_args():
     parser.add_argument('--resume_train', type=int, default=-1, help='resume training, remember to set epoch')
     parser.add_argument('--optimizer', type=str, default='adam', help='optimizer to use (sgd, adam)')
     parser.add_argument('--attn_forcing', type=str, default='decreasing')
+    parser.add_argument('--adapt_epochs', type=int, default=7)
 
     # dataset
     parser.add_argument('--max_vocab', type=int, default=50000)
