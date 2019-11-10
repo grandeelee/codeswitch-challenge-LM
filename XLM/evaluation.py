@@ -9,12 +9,15 @@ import torch.nn.functional as F
 from tqdm import tqdm
 from options import get_args
 from logger import create_logger
+from transformer_ori import LMModel as old_model
 from transformer import LMModel
 from opt import OpenAIAdam
 from my_loader_newsplit import load_mono_data, check_data_params
 
 args = get_args()
 args.model = '../save/bi_directional/xlm_baseline_mix_bi_nostop_valid'
+args.nlayers = 12
+args.gpus = '1'
 # ================= initialization ========================
 logger = create_logger(args.model + '_eval.log')
 
@@ -33,7 +36,6 @@ logger.info("device: {} n_gpu: {}".format(device, n_gpu))
 args.batch_size = 50
 args.n_ctx = 70
 args.max_len = 68
-args.gpus = '1'
 check_data_params(args)
 
 # load data
@@ -85,15 +87,6 @@ def get_batch(iter_name, data_set):
 
 
 # =================== end of data set preparation ============
-
-model = LMModel(args, args.vocab_size)
-criterion = nn.CrossEntropyLoss(reduction='none')
-
-logger.info("Model: {}".format(model))
-logger.info("Number of parameters (model): %i" % sum([p.numel() for p in model.parameters() if p.requires_grad]))
-model.load_state_dict(torch.load(args.model + '.pt'))
-model.to(device)
-model.eval()
 
 
 def getMask(dict_path):
@@ -185,8 +178,32 @@ def sample_sequence(args, model, length, temperature=1000, top_k=20, top_p=0.0):
             context = torch.cat((context, next_token), dim=1)
     return context
 
+def write(words, m, file):
+    """
+    take in a list of words and m is numpy array
+    :param words: list
+    :param m: numpy array
+    :param file: path
+    :return: none
+    """
+    assert len(words) == m.shape[0]
+    f = open(file, 'w', encoding='utf-8')
+    print('%d %d' % m.shape, file=f)
+    for word, m in zip(words, m):
+        print(word + ' ' + ' '.join(['%.6g' % x for x in m]), file=f)
+    f.close()
+
 
 if __name__ == '__main__':
+    model = old_model(args, args.vocab_size, args.n_ctx)
+    criterion = nn.CrossEntropyLoss(reduction='none')
+
+    logger.info("Model: {}".format(model))
+    logger.info("Number of parameters (model): %i" % sum([p.numel() for p in model.parameters() if p.requires_grad]))
+    model.load_state_dict(torch.load(args.model + '.pt'))
+    model.to(device)
+    model.eval()
+    #==================== PPL ========================================
     # Run on test data.
     # test_iterator = get_iterator('cs', 'test')
     # test_loss = evaluate(test_iterator)
@@ -216,7 +233,8 @@ if __name__ == '__main__':
     #     test_loss, math.exp(test_loss)))
     # logger.debug('=' * 89)
 
-    for temp in [0.1, 0.7, 1, 10, 100]:
+    #================= Generator ====================================
+    for temp in [0.7, 1, 10, 100]:
         generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
         generated = generated.cpu().numpy()
         generated_word = []
@@ -225,3 +243,17 @@ if __name__ == '__main__':
                 generated_word.append(dico.id2word[x])
             generated_word.append('\n')
         logger.debug(' '.join(generated_word))
+
+    #================== BLI ========================================
+    matrix = model.transformer.embed.weight.data.cpu().numpy()
+    if not os.path.exists(args.model + '_embed'):
+        write(data['dictionary'].id2word.values(), matrix, args.model + '_embed')
+    logger.info('Embed saved to {}'.format(args.model + '_embed'))
+
+    #================== CS normalization ============================
+    # use cs test
+    # TODO 1) explain pos embed and why it is not nec, compare to rnn using the autoregressive obj.
+    # 2) lit review of CS paper.
+    # 3) implement mask
+    # 4) WER, normalization.
+    # 5) BLI.
