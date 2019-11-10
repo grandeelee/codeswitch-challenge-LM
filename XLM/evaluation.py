@@ -86,7 +86,7 @@ def get_batch(iter_name, data_set):
 
 # =================== end of data set preparation ============
 
-model = LMModel(args, args.vocab_size, args.n_ctx)
+model = LMModel(args, args.vocab_size)
 criterion = nn.CrossEntropyLoss(reduction='none')
 
 logger.info("Model: {}".format(model))
