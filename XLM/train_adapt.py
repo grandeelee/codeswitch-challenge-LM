@@ -314,7 +314,7 @@ if __name__ == '__main__':
     model = LMModel(args, args.vocab_size)
     criterion = nn.CrossEntropyLoss(reduction='none')
 
-    n_updates_total = args.epoch_size * 2 * args.epochs * len(args.directions)
+    n_updates_total = args.sent_per_epoch * 2 * args.epochs * len(args.directions)
     model_opt = OpenAIAdam(model.parameters(),
                            lr=args.lr,
                            schedule=args.lr_schedule,
