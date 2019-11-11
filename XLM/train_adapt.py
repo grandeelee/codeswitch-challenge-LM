@@ -439,6 +439,7 @@ if __name__ == '__main__':
                                vector_l2=args.vector_l2,
                                max_grad_norm=args.max_grad_norm)
         best_val_loss = []
+        stored_loss = 100000000
         model.transformer.attn_forcing = False
         for epoch in range(args.adapt_epochs):
             epoch_start_time = time.time()
@@ -515,6 +516,7 @@ if __name__ == '__main__':
                                vector_l2=args.vector_l2,
                                max_grad_norm=args.max_grad_norm)
         best_val_loss = []
+        stored_loss = 100000000
         model.transformer.attn_forcing = False
         for epoch in range(args.adapt_epochs):
             epoch_start_time = time.time()
