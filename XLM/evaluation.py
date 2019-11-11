@@ -1,5 +1,6 @@
 import time
 import os
+from collections import Counter, OrderedDict
 import random
 import math
 import numpy as np
@@ -15,12 +16,9 @@ from opt import OpenAIAdam
 from my_loader_newsplit import load_mono_data, check_data_params
 
 args = get_args()
-args.model = '../save/bi_directional/xlm_baseline_mix_bi_nostop_valid'
 args.nlayers = 12
-args.gpus = '1'
+args.gpus = '0'
 # ================= initialization ========================
-logger = create_logger(args.model + '_eval.log')
-
 # random.seed(args.seed)
 # np.random.seed(args.seed)
 # torch.manual_seed(args.seed)
@@ -30,25 +28,8 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 n_gpu = torch.cuda.device_count()
-logger.info("device: {} n_gpu: {}".format(device, n_gpu))
+# logger.info("device: {} n_gpu: {}".format(device, n_gpu))
 
-# ============== data set preparation ======================
-args.batch_size = 50
-args.n_ctx = 70
-args.max_len = 68
-check_data_params(args)
-
-# load data
-data = {}
-load_mono_data(args, data)
-dico = data['dictionary']
-args.vocab_size = len(dico)
-assert args.max_len + 2 <= args.n_ctx, 'sequence length cannot accommodate max sent length'
-
-logger.info('------------------------------------------------')
-for key, value in vars(args).items():
-    logger.info('{} : {}'.format(key, value))
-logger.info('------------------------------------------------')
 
 iterators = {}
 
@@ -88,8 +69,17 @@ def get_batch(iter_name, data_set):
 
 # =================== end of data set preparation ============
 
+def getDict(text_path):
+    with open(text_path, 'r', encoding='utf-8') as f:
+        text = f.read().lower().split()
+    cnt = Counter(text)
+    ordered_cnt = OrderedDict(sorted(cnt.items(), key=lambda item: (-item[1], item[0])))
+    id2word = [k for k in ordered_cnt.keys()]
+    with open(text_path + '_vocab', 'w', encoding='utf-8') as f:
+        f.writelines(i + '\n' for i in id2word)
 
-def getMask(dict_path):
+
+def getMask(dict_path, args):
     """
     compare vocab in dict_path with data['dictionary'], return the words in dict_path as true, else false
     :param dict_path: the dictionary path containing a list of vocab
@@ -97,7 +87,15 @@ def getMask(dict_path):
     """
     with open(dict_path, 'r', encoding='utf-8') as f:
         target_vocab = f.read().split()
-    vocab_mask = torch.empty((len(dico)), dtype=torch.bool)
+    vocab_mask = torch.empty((len(dico)), dtype=torch.bool).fill_(False)
+    for i, word in dico.id2word.items():
+        if i in [0, 1, 2, 3]:
+            continue
+        if word not in target_vocab:
+            vocab_mask[i] = True
+    torch.save(vocab_mask, args.model + '_mask')
+    logger.info('save mask to {}'.format(args.model + '_mask'))
+    return vocab_mask
 
 
 def maskLogits(logits, vocab_mask):
@@ -112,10 +110,13 @@ def maskLogits(logits, vocab_mask):
     return logits
 
 
-def evaluate(generator):
+def evaluate(model, criterion, generator, mask=None):
     # Turn on evaluation mode which disables dropout.
     total_loss = 0
     n_words = 0
+    if mask is not None:
+        dict_mask = torch.zeros(1, args.vocab_size)
+        dict_mask[:, mask] = -1e12
     with torch.no_grad():
         for x, lengths in generator:
             alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
@@ -127,6 +128,9 @@ def evaluate(generator):
             y = y.to(device)
             lm_logits = model(x)
             lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
+            if mask is not None:
+                dict_mask = dict_mask.to(device)
+                lm_logits = lm_logits + dict_mask
             lm_losses = criterion(lm_logits, y)
             lm_losses = lm_losses.sum() / torch.sum(pred_mask)
             n_words += torch.sum(pred_mask)
@@ -166,7 +170,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     return logits
 
 
-def sample_sequence(args, model, length, temperature=1000, top_k=20, top_p=0.0):
+def sample_sequence(args, model, dico, length, temperature=1000, top_k=20, top_p=0.0):
     bos_idx = dico.word2id['<s>']
     context = torch.full((args.batch_size, 1), bos_idx, dtype=torch.long).to(device)
     with torch.no_grad():
@@ -177,6 +181,7 @@ def sample_sequence(args, model, length, temperature=1000, top_k=20, top_p=0.0):
             next_token = torch.multinomial(filtered_logits, num_samples=1)
             context = torch.cat((context, next_token), dim=1)
     return context
+
 
 def write(words, m, file):
     """
@@ -194,7 +199,7 @@ def write(words, m, file):
     f.close()
 
 
-if __name__ == '__main__':
+def evaluator(args, dico):
     model = old_model(args, args.vocab_size, args.n_ctx)
     criterion = nn.CrossEntropyLoss(reduction='none')
 
@@ -203,39 +208,74 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(args.model + '.pt'))
     model.to(device)
     model.eval()
-    #==================== PPL ========================================
+    # ==================== PPL ========================================
     # Run on test data.
-    # test_iterator = get_iterator('cs', 'test')
-    # test_loss = evaluate(test_iterator)
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
-    # # Run on test data.
-    # test_iterator = get_iterator('cs', 'test_cs')
-    # test_loss = evaluate(test_iterator)
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
-    # # Run on test data.
-    # test_iterator = get_iterator('cs', 'test_en')
-    # test_loss = evaluate(test_iterator)
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
-    # # Run on test data.
-    # test_iterator = get_iterator('cs', 'test_zh')
-    # test_loss = evaluate(test_iterator)
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
+    test_iterator = get_iterator('cs', 'test')
+    test_loss = evaluate(model, criterion, test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_cs')
+    test_loss = evaluate(model, criterion, test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_en')
+    test_loss = evaluate(model, criterion, test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_zh')
+    test_loss = evaluate(model, criterion, test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # here use the mask and get ppl to compare with benchmark
+    if not os.path.exists(args.model + '_mask'):
+        mask = getMask('/home/grandee/projects/LM/data/cs/seame.full_vocab', args)
+    else:
+        logger.info('loading mask from {}'.format(args.model + '_mask'))
+        mask = torch.load(args.model + "_mask")
+    logger.info('the new vocab is {}, {} no of vocab masked'.format(args.vocab_size - sum(mask), sum(mask)))
+    test_iterator = get_iterator('cs', 'test')
+    test_loss = evaluate(model, criterion, test_iterator, mask)
+    logger.debug('test_loss: {}'.format(test_loss))
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_cs')
+    test_loss = evaluate(model, criterion, test_iterator, mask)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_en')
+    test_loss = evaluate(model, criterion, test_iterator, mask)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_zh')
+    test_loss = evaluate(model, criterion, test_iterator, mask)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
 
-    #================= Generator ====================================
+    # ================= Generator ====================================
     for temp in [0.7, 1, 10, 100]:
-        generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
+        generated = sample_sequence(args, model, dico, args.n_ctx, temperature=temp)
         generated = generated.cpu().numpy()
         generated_word = []
         for l in generated:
@@ -244,16 +284,42 @@ if __name__ == '__main__':
             generated_word.append('\n')
         logger.debug(' '.join(generated_word))
 
-    #================== BLI ========================================
+    # ================== BLI ========================================
     matrix = model.transformer.embed.weight.data.cpu().numpy()
     if not os.path.exists(args.model + '_embed'):
         write(data['dictionary'].id2word.values(), matrix, args.model + '_embed')
     logger.info('Embed saved to {}'.format(args.model + '_embed'))
 
-    #================== CS normalization ============================
+    # ================== CS normalization ============================
     # use cs test
     # TODO 1) explain pos embed and why it is not nec, compare to rnn using the autoregressive obj.
     # 2) lit review of CS paper.
-    # 3) implement mask
     # 4) WER, normalization.
     # 5) BLI.
+
+
+if __name__ == '__main__':
+    model_paths = ['/home/grandee/projects/LM/save/xlm_baseline_mix',
+                   '/home/grandee/projects/LM/save/xlm_baseline_mix_adapt']
+    for path in model_paths:
+        args.model = path
+        logger = create_logger(args.model + '_eval.log')
+        # ============== data set preparation ======================
+        args.batch_size = 50
+        args.n_ctx = 70
+        args.max_len = 68
+        check_data_params(args)
+
+        # load data
+        data = {}
+        load_mono_data(args, data)
+        dico = data['dictionary']
+        args.vocab_size = len(dico)
+        assert args.max_len + 2 <= args.n_ctx, 'sequence length cannot accommodate max sent length'
+
+        logger.info('------------------------------------------------')
+        for key, value in vars(args).items():
+            logger.info('{} : {}'.format(key, value))
+        logger.info('------------------------------------------------')
+
+        evaluator(args, dico)
