@@ -323,3 +323,4 @@ if __name__ == '__main__':
         logger.info('------------------------------------------------')
 
         evaluator(args, dico)
+        logger.close()
