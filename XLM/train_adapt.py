@@ -351,10 +351,10 @@ if __name__ == '__main__':
             model.transformer.attn_forcing = True
             if args.attn_forcing == 'decreasing':
                 logger.info("decreasing attention weights for attention forcing")
-                model.transformer.attn_weight = max(0.0, 0.5 - epoch * (0.5 / 23))
+                model.transformer.attn_weight = max(0.0, 1.0 - epoch * (1.0 / 43))
             elif args.attn_forcing == 'increasing':
                 logger.info("increasing attention weights for attention forcing")
-                model.transformer.attn_weight = max(0.0, 0.0 + (epoch - 6) * (0.5 / 23))
+                model.transformer.attn_weight = max(0.0, min(1.0, 0.0 + (epoch - 6) * (1.0 / 43)))
             elif args.attn_forcing == 'constant':
                 logger.info('set attention weights for attention forcing to be zero')
                 model.transformer.attn_weight = 0.0
