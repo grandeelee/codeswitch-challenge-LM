@@ -295,7 +295,6 @@ def evaluator(args, dico):
     # TODO 1) explain pos embed and why it is not nec, compare to rnn using the autoregressive obj.
     # 2) lit review of CS paper.
     # 4) WER, normalization.
-    # 5) BLI.
 
 
 if __name__ == '__main__':
