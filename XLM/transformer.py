@@ -204,10 +204,10 @@ class TransformerModel(nn.Module):
         # Add the position information to the input embeddings
         if self.use_pos or self.sin_embed:
             assert idx is not None, 'expect idx not None'
-            if idx == 0:
+            if all(idx == 0):
                 pos = torch.arange(x.size(-1), dtype=torch.long, device=x.device)
             else:
-                assert idx > 0, 'expect idx greater than 0, got idx {}'.format(idx)
+                assert all(idx > 0), 'expect idx greater than 0, got idx {}'.format(idx)
                 pos = torch.cat([torch.arange(idx), torch.arange(idx, x.size(-1))])
             p = embedded_dropout(self.pos_embed, pos, dropout=self.drop if self.training else 0)
             e = e + p
