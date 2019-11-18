@@ -25,7 +25,7 @@ class Dataset(object):
         self.pos = pos
         # the length of each sent, without counting the eos index
         self.lengths = self.pos[:, 1] - self.pos[:, 0]
-
+        self.pos_embed = params.pos_embed or params.sin_embed
         # check number of sentences
         # assert len(self.pos) == np.sum(self.sent == self.dictionary.word2id[EOS_WORD])
 
@@ -61,13 +61,29 @@ class Dataset(object):
         bos_idx = self.dictionary.word2id[BOS_WORD]
 
         lengths = torch.LongTensor([len(s) + 2 for s in sentences])
-        sent = torch.LongTensor(lengths.size(0), lengths.max().item()).fill_(pad_idx)
+        if self.pos_embed:
+            sent = torch.LongTensor(lengths.size(0), lengths.max().item(), 2).fill_(pad_idx)
+        else:
+            sent = torch.LongTensor(lengths.size(0), lengths.max().item()).fill_(pad_idx)
+
         if direction == 'forward':
             # set the start of the sequence to be eos and the end to be a pad
-            sent[:, 0] = bos_idx
-            for i, s in enumerate(sentences):
-                sent[i, 1:lengths[i] - 1].copy_(torch.from_numpy(s.astype(np.int64)))
-                sent[i, lengths[i] - 1] = eos_idx
+            if self.pos_embed:
+                sent[:, 0, 0] = bos_idx
+                for i, s in enumerate(sentences):
+                    sent[i, 1:lengths[i] - 1, 0].copy_(torch.from_numpy(s.astype(np.int64)))
+                    sent[i, lengths[i] - 1, 0] = eos_idx
+                    if sum(sent[i, :, 0] == 0) == 2:
+                        idx = (sent[i, :, 0] == 0).nonzero()[1, 0]
+                        sent[i, :, 1] = torch.cat([torch.arange(idx), torch.arange(0, lengths.max() - idx)])
+                    else:
+                        sent[i, :, 1] = torch.arange(lengths.max())
+            else:
+                sent[:, 0] = bos_idx
+                for i, s in enumerate(sentences):
+                    sent[i, 1:lengths[i] - 1].copy_(torch.from_numpy(s.astype(np.int64)))
+                    sent[i, lengths[i] - 1] = eos_idx
+
         if direction == 'backward':
             sent[:, 0] = eos_idx
             for i, s in enumerate(sentences):

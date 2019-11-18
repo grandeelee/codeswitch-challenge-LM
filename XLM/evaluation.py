@@ -18,7 +18,7 @@ from my_loader_newsplit import load_mono_data, check_data_params
 
 args = get_args()
 args.nlayers = 12
-args.gpus = '0'
+args.gpus = '2'
 # ================= initialization ========================
 # random.seed(args.seed)
 # np.random.seed(args.seed)
@@ -107,15 +107,20 @@ def getCSMask(dico, args):
     :return: boolen of size [vocab,]
     """
     cs_mask = []
+    num_mask = []
     for word in dico.word2id.keys():
         if len(re.findall(r'[a-z]+', word)) > 0:
             cs_mask.append(True)
         else:
             cs_mask.append(False)
+        if len(re.findall(r'\d', word)) > 0:
+            num_mask.append(True)
+        else:
+            num_mask.append(False)
     cs_mask[:14] = [False for _ in range(14)]
     # with open(args.model + '_cs_mask', 'w', encoding='utf-8') as f:
     #     f.writelines(str(i) + '\n' for i in cs_mask)
-    return cs_mask
+    return cs_mask, num_mask
 
 
 def maskLogits(logits, vocab_mask):
@@ -206,18 +211,22 @@ def sample_sequence(args, model, dico, length, temperature=1000, top_k=20, top_p
     batch = args.batch_size
     if mask is not None:
         batch = 1
+        cs_mask, num_mask = mask
     bos_idx = dico.word2id['<s>']
     context = torch.full((batch, 1), bos_idx, dtype=torch.long).to(device)
     with torch.no_grad():
         for _ in tqdm(range(length)):
             outputs = model(context)
-            next_token_logits = outputs[:, -1, :] / temperature
+            next_token_logits = outputs[:, -1, :]
             if mask is not None:
-                next_token_logits[mask] = next_token_logits[mask] * 10
+                next_token_logits[0][cs_mask] = next_token_logits[0][cs_mask] * 2
+                next_token_logits[0][num_mask] = next_token_logits[0][num_mask] / 5
+            next_token_logits /= temperature
             filtered_logits = F.softmax(top_k_top_p_filtering(next_token_logits, top_k=top_k, top_p=top_p), dim=-1)
             next_token = torch.multinomial(filtered_logits, num_samples=1)
-            if mask[next_token[0]]:
-                mask = [not i for i in mask]
+            if cs_mask[next_token[0]]:
+                cs_mask = [not i for i in cs_mask]
+                cs_mask[:14] = [False for _ in range(14)]
             context = torch.cat((context, next_token), dim=1)
     return context
 

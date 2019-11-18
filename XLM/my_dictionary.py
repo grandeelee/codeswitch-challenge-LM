@@ -374,5 +374,3 @@ class Dictionary(object):
             torch.save(data, bin_path, pickle_protocol=4)
 
         return data
-
-
