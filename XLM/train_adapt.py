@@ -95,7 +95,10 @@ def evaluate(generator):
     for x, lengths in generator:
         alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
         pred_mask = alen[None] < lengths[:, None] - 1
-        y = x[:, 1:].masked_select(pred_mask[:, :-1])
+        if args.pos_embed or args.sin_embed:
+            y = x[:, 1:, 0].masked_select(pred_mask[:, :-1])
+        else:
+            y = x[:, 1:].masked_select(pred_mask[:, :-1])
 
         x = x.to(device)
         pred_mask = pred_mask.to(device)
@@ -154,7 +157,10 @@ def run_epoch():
             # if params.context_size > 0:  # do not predict without context
             #     pred_mask[:params.context_size] = 0
             # select target to be first word until eos
-            y = x[:, 1:].masked_select(pred_mask[:, :-1])
+            if args.pos_embed or args.sin_embed:
+                y = x[:, 1:, 0].masked_select(pred_mask[:, :-1])
+            else:
+                y = x[:, 1:].masked_select(pred_mask[:, :-1])
             assert pred_mask.sum().item() == y.size(0)
 
             x = x.to(device)
@@ -183,7 +189,10 @@ def run_epoch():
             # if params.context_size > 0:  # do not predict without context
             #     pred_mask[:params.context_size] = 0
             # select target to be first word until eos
-            y = x[:, 1:].masked_select(pred_mask[:, :-1])
+            if args.pos_embed or args.sin_embed:
+                y = x[:, 1:, 0].masked_select(pred_mask[:, :-1])
+            else:
+                y = x[:, 1:].masked_select(pred_mask[:, :-1])
             assert pred_mask.sum().item() == y.size(0)
 
             x = x.to(device)
@@ -234,7 +243,10 @@ def run_adapt_epoch(iter_name, data_set):
             # if params.context_size > 0:  # do not predict without context
             #     pred_mask[:params.context_size] = 0
             # select target to be first word until eos
-            y = x[:, 1:].masked_select(pred_mask[:, :-1])
+            if args.pos_embed or args.sin_embed:
+                y = x[:, 1:, 0].masked_select(pred_mask[:, :-1])
+            else:
+                y = x[:, 1:].masked_select(pred_mask[:, :-1])
             assert pred_mask.sum().item() == y.size(0)
 
             x = x.to(device)
