@@ -19,6 +19,17 @@ def swish(x):
     return x * torch.sigmoid(x)
 
 
+def create_sinusoidal_embeddings(n_pos, dim, out):
+    position_enc = np.array([
+        [pos / np.power(10000, 2 * (j // 2) / dim) for j in range(dim)]
+        for pos in range(n_pos)
+    ])
+    out[:, 0::2] = torch.FloatTensor(np.sin(position_enc[:, 0::2]))
+    out[:, 1::2] = torch.FloatTensor(np.cos(position_enc[:, 1::2]))
+    out.detach_()
+    out.requires_grad = False
+
+
 ACT_FNS = {
     'relu': nn.ReLU(),
     'swish': swish,
@@ -168,11 +179,14 @@ class TransformerModel(nn.Module):
     def __init__(self, cfg, vocab=10):
         super(TransformerModel, self).__init__()
         self.use_pos = cfg.pos_embed
+        self.sin_embed = cfg.sin_embed
         self.vocab = vocab
         self.attn_weight = 1.0
-        self.attn_forcing = True
+        self.attn_forcing = False
         self.embed = nn.Embedding(vocab, cfg.emsize)
         self.pos_embed = nn.Embedding(cfg.n_ctx, cfg.emsize)
+        if self.sin_embed:
+            create_sinusoidal_embeddings(cfg.n_ctx, cfg.emsize, out=self.pos_embed.weight)
         #  dropout try LSTM regularize paper
         # self.drop = nn.Dropout(cfg.embd_pdrop)
         self.drop = cfg.embd_pdrop
@@ -182,16 +196,22 @@ class TransformerModel(nn.Module):
         nn.init.normal_(self.embed.weight, std=0.02)
 
     def forward(self, x):
-        if self.attn_forcing:
+        if self.attn_forcing or self.sin_embed or self.use_pos:
             idx = (x == 0).nonzero()[:, 1].nonzero()[:, 0]
         else:
             idx = None
         e = embedded_dropout(self.embed, x, dropout=self.drop if self.training else 0)
         # Add the position information to the input embeddings
-        if self.use_pos:
-            pos = torch.arange(x.size(-1), dtype=torch.long, device=x.device)
+        if self.use_pos or self.sin_embed:
+            assert idx is not None, 'expect idx not None'
+            if idx == 0:
+                pos = torch.arange(x.size(-1), dtype=torch.long, device=x.device)
+            else:
+                assert idx > 0, 'expect idx greater than 0, got idx {}'.format(idx)
+                pos = torch.cat([torch.arange(idx), torch.arange(idx, x.size(-1))])
             p = embedded_dropout(self.pos_embed, pos, dropout=self.drop if self.training else 0)
             e = e + p
+
         h = self.lockdrop(e)
         for block in self.h:
             h = block(h, idx, self.attn_weight, self.attn_forcing)

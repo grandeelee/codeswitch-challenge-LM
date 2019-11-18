@@ -8,7 +8,8 @@ def get_args():
     parser.add_argument('--model', type=str, default='../save/test', help='location of the model')
 
     # model
-    parser.add_argument('--pos_embed', type=bool, default=False, help='whether use position embedding')
+    parser.add_argument('--pos_embed', action='store_true', help='whether use position embedding')
+    parser.add_argument('--sin_embed', action='store_true', help='whether use position embedding')
     parser.add_argument('--emsize', type=int, default=384, help='size of word embeddings')
     parser.add_argument('--n_ctx', type=int, default=70, help='sequence length')
     parser.add_argument('--n_heads', type=int, default=12)
