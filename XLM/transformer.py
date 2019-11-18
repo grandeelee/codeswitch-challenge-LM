@@ -182,9 +182,9 @@ class TransformerModel(nn.Module):
         self.attn_weight = 1.0
         self.attn_forcing = False
         self.embed = nn.Embedding(vocab, cfg.emsize)
-        self.pos_embed = nn.Embedding(cfg.n_ctx, cfg.emsize)
-        if self.sin_embed:
-            create_sinusoidal_embeddings(cfg.n_ctx, cfg.emsize, out=self.pos_embed.weight)
+        # self.pos_embed = nn.Embedding(cfg.n_ctx, cfg.emsize)
+        # if self.sin_embed:
+        #     create_sinusoidal_embeddings(cfg.n_ctx, cfg.emsize, out=self.pos_embed.weight)
         #  dropout try LSTM regularize paper
         # self.drop = nn.Dropout(cfg.embd_pdrop)
         self.drop = cfg.embd_pdrop
