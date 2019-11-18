@@ -178,8 +178,6 @@ class TransformerModel(nn.Module):
 
     def __init__(self, cfg, vocab=10):
         super(TransformerModel, self).__init__()
-        self.use_pos = cfg.pos_embed
-        self.sin_embed = cfg.sin_embed
         self.vocab = vocab
         self.attn_weight = 1.0
         self.attn_forcing = False
@@ -196,23 +194,22 @@ class TransformerModel(nn.Module):
         nn.init.normal_(self.embed.weight, std=0.02)
 
     def forward(self, x):
-        if self.attn_forcing or self.sin_embed or self.use_pos:
+        if self.attn_forcing:
             idx = (x == 0).nonzero()[:, 1]
             idx = idx[idx.nonzero()][:, 0]
         else:
             idx = None
         e = embedded_dropout(self.embed, x, dropout=self.drop if self.training else 0)
         # Add the position information to the input embeddings
-        if self.use_pos or self.sin_embed:
-            assert idx is not None, 'expect idx not None'
-            if all(idx == 0):
-                pos = torch.arange(x.size(-1), dtype=torch.long, device=x.device)
-            else:
-                assert all(idx > 0), 'expect idx greater than 0, got idx {}'.format(idx)
-                pos = torch.stack([torch.cat([torch.arange(i), torch.arange(0, x.size(-1) - i)]) for i in idx]).to(x.device)
-            p = embedded_dropout(self.pos_embed, pos, dropout=self.drop if self.training else 0)
-            e = e + p
-
+        # if self.use_pos or self.sin_embed:
+        #     assert idx is not None, 'expect idx not None'
+        #     if all(idx == 0):
+        #         pos = torch.arange(x.size(-1), dtype=torch.long, device=x.device)
+        #     else:
+        #         assert all(idx > 0), 'expect idx greater than 0, got idx {}'.format(idx)
+        #         pos = torch.stack([torch.cat([torch.arange(i), torch.arange(0, x.size(-1) - i)]) for i in idx]).to(x.device)
+        #     p = embedded_dropout(self.pos_embed, pos, dropout=self.drop if self.training else 0)
+        #     e = e + p
         h = self.lockdrop(e)
         for block in self.h:
             h = block(h, idx, self.attn_weight, self.attn_forcing)
