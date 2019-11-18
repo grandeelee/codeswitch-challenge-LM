@@ -209,9 +209,7 @@ class TransformerModel(nn.Module):
                 pos = torch.arange(x.size(-1), dtype=torch.long, device=x.device)
             else:
                 assert all(idx > 0), 'expect idx greater than 0, got idx {}'.format(idx)
-                logger.debug('idx is {}'.format(idx))
                 pos = torch.stack([torch.cat([torch.arange(i), torch.arange(0, x.size(-1) - i)]) for i in idx])
-                logger.debug('pos is {}'.format(pos))
             p = embedded_dropout(self.pos_embed, pos, dropout=self.drop if self.training else 0)
             e = e + p
 
