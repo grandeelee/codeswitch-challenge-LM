@@ -203,9 +203,9 @@ class TransformerModel(nn.Module):
             idx = None
         e = embedded_dropout(self.embed, x, dropout=self.drop if self.training else 0)
         # Add the position information to the input embeddings
-        if self.use_pos or self.sin_embed:
+        if self.pos_embed or self.sin_embed:
             pos = x[:, :, 1]
-            p = embedded_dropout(self.pos_embed, pos, dropout=self.drop if self.training else 0)
+            p = embedded_dropout(self.position_embed, pos, dropout=self.drop if self.training else 0)
             e = e + p
         h = self.lockdrop(e)
         for block in self.h:
