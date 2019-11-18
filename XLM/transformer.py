@@ -197,7 +197,8 @@ class TransformerModel(nn.Module):
 
     def forward(self, x):
         if self.attn_forcing or self.sin_embed or self.use_pos:
-            idx = (x == 0).nonzero()[:, 1].nonzero()[:, 0]
+            idx = (x == 0).nonzero()[:, 1]
+            idx = idx[idx.nonzero()][:, 0]
         else:
             idx = None
         e = embedded_dropout(self.embed, x, dropout=self.drop if self.training else 0)

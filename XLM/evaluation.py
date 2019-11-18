@@ -170,15 +170,34 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     return logits
 
 
-def sample_sequence(args, model, dico, length, temperature=1000, top_k=20, top_p=0.0):
+def sample_sequence(args, model, dico, length, temperature=1000, top_k=20, top_p=0.0, mask=None):
+    """
+
+    :param args:
+    :param model:
+    :param dico:
+    :param length:
+    :param temperature:
+    :param top_k:
+    :param top_p:
+    :param mask: a list english token is True, chinese token is False
+    :return:
+    """
+    batch = args.batch_size
+    if mask is not None:
+        batch = 1
     bos_idx = dico.word2id['<s>']
-    context = torch.full((args.batch_size, 1), bos_idx, dtype=torch.long).to(device)
+    context = torch.full((batch, 1), bos_idx, dtype=torch.long).to(device)
     with torch.no_grad():
         for _ in tqdm(range(length)):
             outputs = model(context)
             next_token_logits = outputs[:, -1, :] / temperature
+            if mask is not None:
+                next_token_logits[mask] = next_token_logits[mask] * 10
             filtered_logits = F.softmax(top_k_top_p_filtering(next_token_logits, top_k=top_k, top_p=top_p), dim=-1)
             next_token = torch.multinomial(filtered_logits, num_samples=1)
+            if mask[next_token[0]]:
+                mask = [not i for i in mask]
             context = torch.cat((context, next_token), dim=1)
     return context
 
