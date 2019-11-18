@@ -200,7 +200,7 @@ def load_data(params):
                                                         len(data['cs'][data_set])))
     # parallel data summary
     for name in data['train'].keys():
-        logger.info('{: <18} - {: >5} - {: >12}:{: >10}'.format('Parallel data', 'train', '%s-%s' % name,
+        logger.info('{: <18} - {: >5} - {: >12}:{: >10}'.format('Parallel data', 'train', '%s' % name,
                                                                 len(data['train'][name])))
 
     logger.info("")
