@@ -197,7 +197,7 @@ class TransformerModel(nn.Module):
 
     def forward(self, x):
         if self.attn_forcing:
-            idx = (x[:, :, 0] == 0).nonzero()[:, 1]
+            idx = (x == 0).nonzero()[:, 1]
             idx = idx[idx.nonzero()][:, 0]
         else:
             idx = None
