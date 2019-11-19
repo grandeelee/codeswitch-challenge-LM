@@ -321,8 +321,8 @@ if __name__ == '__main__':
     if args.resume_train > 0:
         epoch_start = args.resume_train
         logger.info('resume training from epoch: {}'.format(epoch_start))
-        logger.info('loading model from {}'.format(args.model + '_train.pt'))
-        model.load_state_dict(torch.load(args.model + '_train.pt'))
+        logger.info('loading model from {}'.format(args.model + '_valid.pt'))
+        model.load_state_dict(torch.load(args.model + '_valid.pt'))
     # At any point you can hit Ctrl + C to break out of training early.
     try:
         for epoch in range(epoch_start, args.epochs):
