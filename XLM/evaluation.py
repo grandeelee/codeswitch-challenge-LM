@@ -146,7 +146,10 @@ def evaluate(model, criterion, generator, mask=None):
         for x, lengths in generator:
             alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
             pred_mask = alen[None] < lengths[:, None] - 1
-            y = x[:, 1:].masked_select(pred_mask[:, :-1])
+            if args.pos_embed or args.sin_embed:
+                y = x[:, 1:, 0].masked_select(pred_mask[:, :-1])
+            else:
+                y = x[:, 1:].masked_select(pred_mask[:, :-1])
 
             x = x.to(device)
             pred_mask = pred_mask.to(device)
@@ -248,7 +251,7 @@ def write(words, m, file):
 
 
 def evaluator(args, dico):
-    model = old_model(args, args.vocab_size, args.n_ctx)
+    model = LMModel(args, args.vocab_size)
     criterion = nn.CrossEntropyLoss(reduction='none')
 
     logger.info("Model: {}".format(model))
@@ -256,70 +259,70 @@ def evaluator(args, dico):
     model.load_state_dict(torch.load(args.model + '.pt'))
     model.to(device)
     model.eval()
-    # # ==================== PPL ========================================
-    # # Run on test data.
-    # test_iterator = get_iterator('cs', 'test')
-    # test_loss = evaluate(model, criterion, test_iterator)
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
-    # # Run on test data.
-    # test_iterator = get_iterator('cs', 'test_cs')
-    # test_loss = evaluate(model, criterion, test_iterator)
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
-    # # Run on test data.
-    # test_iterator = get_iterator('cs', 'test_en')
-    # test_loss = evaluate(model, criterion, test_iterator)
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
-    # # Run on test data.
-    # test_iterator = get_iterator('cs', 'test_zh')
-    # test_loss = evaluate(model, criterion, test_iterator)
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
-    # # here use the mask and get ppl to compare with benchmark
-    # if not os.path.exists(args.model + '_mask'):
-    #     mask = getMask('/home/grandee/projects/LM/data/cs/seame.full_vocab', args)
-    # else:
-    #     logger.info('loading mask from {}'.format(args.model + '_mask'))
-    #     mask = torch.load(args.model + "_mask")
-    # logger.info('the new vocab is {}, {} no of vocab masked'.format(args.vocab_size - sum(mask), sum(mask)))
-    # test_iterator = get_iterator('cs', 'test')
-    # test_loss = evaluate(model, criterion, test_iterator, mask)
-    # logger.debug('test_loss: {}'.format(test_loss))
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
-    # # Run on test data.
-    # test_iterator = get_iterator('cs', 'test_cs')
-    # test_loss = evaluate(model, criterion, test_iterator, mask)
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
-    # # Run on test data.
-    # test_iterator = get_iterator('cs', 'test_en')
-    # test_loss = evaluate(model, criterion, test_iterator, mask)
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
-    # # Run on test data.
-    # test_iterator = get_iterator('cs', 'test_zh')
-    # test_loss = evaluate(model, criterion, test_iterator, mask)
-    # logger.debug('=' * 89)
-    # logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
-    #     test_loss, math.exp(test_loss)))
-    # logger.debug('=' * 89)
+    # ==================== PPL ========================================
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test')
+    test_loss = evaluate(model, criterion, test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_cs')
+    test_loss = evaluate(model, criterion, test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_en')
+    test_loss = evaluate(model, criterion, test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_zh')
+    test_loss = evaluate(model, criterion, test_iterator)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # here use the mask and get ppl to compare with benchmark
+    if not os.path.exists(args.model + '_mask'):
+        mask = getMask('/home/grandee/projects/LM/data/cs/seame.full_vocab', args)
+    else:
+        logger.info('loading mask from {}'.format(args.model + '_mask'))
+        mask = torch.load(args.model + "_mask")
+    logger.info('the new vocab is {}, {} no of vocab masked'.format(args.vocab_size - sum(mask), sum(mask)))
+    test_iterator = get_iterator('cs', 'test')
+    test_loss = evaluate(model, criterion, test_iterator, mask)
+    logger.debug('test_loss: {}'.format(test_loss))
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_cs')
+    test_loss = evaluate(model, criterion, test_iterator, mask)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_en')
+    test_loss = evaluate(model, criterion, test_iterator, mask)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
+    # Run on test data.
+    test_iterator = get_iterator('cs', 'test_zh')
+    test_loss = evaluate(model, criterion, test_iterator, mask)
+    logger.debug('=' * 89)
+    logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+        test_loss, math.exp(test_loss)))
+    logger.debug('=' * 89)
 
     # ================= Generator ====================================
     cs_mask = getCSMask(dico, args)
@@ -334,10 +337,10 @@ def evaluator(args, dico):
         logger.debug(' '.join(generated_word))
 
     # # ================== BLI ========================================
-    # matrix = model.transformer.embed.weight.data.cpu().numpy()
-    # if not os.path.exists(args.model + '_embed'):
-    #     write(data['dictionary'].id2word.values(), matrix, args.model + '_embed')
-    # logger.info('Embed saved to {}'.format(args.model + '_embed'))
+    matrix = model.transformer.embed.weight.data.cpu().numpy()
+    if not os.path.exists(args.model + '_embed'):
+        write(data['dictionary'].id2word.values(), matrix, args.model + '_embed')
+    logger.info('Embed saved to {}'.format(args.model + '_embed'))
 
     # ================== CS normalization ============================
     # use cs test
@@ -347,7 +350,7 @@ def evaluator(args, dico):
 
 
 if __name__ == '__main__':
-    model_paths = ['/home/grandee/projects/LM/save/xlm_baseline_mix']
+    model_paths = ['/home/grandee/projects/LM/save/mono_only_train_adapt']
     # '/home/grandee/projects/LM/save/xlm_baseline_mix_adapt']
     for path in model_paths:
         args.model = path
