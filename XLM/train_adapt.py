@@ -346,95 +346,95 @@ if __name__ == '__main__':
 
     # model = nn.DataParallel(model)
 
-    best_val_loss = []
-    stored_loss = 100000000
-    epoch_start = 0
-    if args.resume_train > 0:
-        epoch_start = args.resume_train
-        logger.info('resume training from epoch: {}'.format(epoch_start))
-        logger.info('loading model from {}'.format(args.model + '_train.pt'))
-        model.load_state_dict(torch.load(args.model + '_train.pt'))
+    # best_val_loss = []
+    # stored_loss = 100000000
+    # epoch_start = 0
+    # if args.resume_train > 0:
+    #     epoch_start = args.resume_train
+    #     logger.info('resume training from epoch: {}'.format(epoch_start))
+    #     logger.info('loading model from {}'.format(args.model + '_train.pt'))
+    #     model.load_state_dict(torch.load(args.model + '_train.pt'))
     # At any point you can hit Ctrl + C to break out of training early.
     try:
-        for epoch in range(epoch_start, args.epochs):
-            epoch_start_time = time.time()
-            assert args.attn_forcing in ['decreasing', 'increasing', 'constant', 'None'], \
-                'unexpected entry for attn_forcing: [}'.format(args.attn_forcing)
-            model.transformer.attn_forcing = True
-            if args.attn_forcing == 'decreasing':
-                logger.info("decreasing attention weights for attention forcing")
-                model.transformer.attn_weight = max(0.1, 1.0 - epoch * (1.0 / 43))
-            elif args.attn_forcing == 'increasing':
-                logger.info("increasing attention weights for attention forcing")
-                model.transformer.attn_weight = max(0.0, min(1.0, 0.0 + (epoch - 6) * (1.0 / 43)))
-            elif args.attn_forcing == 'constant':
-                logger.info('set attention weights for attention forcing to be zero')
-                model.transformer.attn_weight = 0.1
-            elif args.attn_forcing == 'None':
-                logger.info('No attention forcing is used')
-                model.transformer.attn_forcing = False
-            run_epoch()
-            valid_iterator = get_iterator('cs', 'valid')
-            model.transformer.attn_forcing = False
-            val_loss = evaluate(valid_iterator)
-            logger.info('-' * 89)
-            logger.info('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
-                        'valid_en ppl {:8.2f} |'.format(
-                epoch + 1, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
-            logger.info('-' * 89)
-
-            torch.save(model.state_dict(), args.model + '_train.pt')
-            logger.info('Saving model')
-
-            # for temp in [0.7, 1, 10, 100]:
-            #     generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
-            #     generated = generated.cpu().numpy()
-            #     generated_word = []
-            #     for l in generated:
-            #         for x in l:
-            #             generated_word.append(data['dictionary'].id2word[x])
-            #         generated_word.append('\n')
-            #     logger.debug(' '.join(generated_word))
-
-            if val_loss < stored_loss:
-                torch.save(model.state_dict(), args.model + '_valid.pt')
-                logger.info('Saving model (new best validation)')
-                stored_loss = val_loss
-
-                # Run on test data.
-                test_iterator = get_iterator('cs', 'test')
-                test_loss = evaluate(test_iterator)
-                logger.debug('=' * 89)
-                logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
-                    test_loss, math.exp(test_loss)))
-                logger.debug('=' * 89)
-                # Run on test data.
-                test_iterator = get_iterator('cs', 'test_cs')
-                test_loss = evaluate(test_iterator)
-                logger.debug('=' * 89)
-                logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
-                    test_loss, math.exp(test_loss)))
-                logger.debug('=' * 89)
-                # Run on test data.
-                test_iterator = get_iterator('cs', 'test_en')
-                test_loss = evaluate(test_iterator)
-                logger.debug('=' * 89)
-                logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
-                    test_loss, math.exp(test_loss)))
-                logger.debug('=' * 89)
-                # Run on test data.
-                test_iterator = get_iterator('cs', 'test_zh')
-                test_loss = evaluate(test_iterator)
-                logger.debug('=' * 89)
-                logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
-                    test_loss, math.exp(test_loss)))
-                logger.debug('=' * 89)
-
-            # if len(best_val_loss) > 17 and val_loss > min(best_val_loss[:-5]):
-            #     logger.info('Early stop')
-            #     break
-
-            best_val_loss.append(val_loss)
+        # for epoch in range(epoch_start, args.epochs):
+        #     epoch_start_time = time.time()
+        #     assert args.attn_forcing in ['decreasing', 'increasing', 'constant', 'None'], \
+        #         'unexpected entry for attn_forcing: [}'.format(args.attn_forcing)
+        #     model.transformer.attn_forcing = True
+        #     if args.attn_forcing == 'decreasing':
+        #         logger.info("decreasing attention weights for attention forcing")
+        #         model.transformer.attn_weight = max(0.1, 1.0 - epoch * (1.0 / 43))
+        #     elif args.attn_forcing == 'increasing':
+        #         logger.info("increasing attention weights for attention forcing")
+        #         model.transformer.attn_weight = max(0.0, min(1.0, 0.0 + (epoch - 6) * (1.0 / 43)))
+        #     elif args.attn_forcing == 'constant':
+        #         logger.info('set attention weights for attention forcing to be zero')
+        #         model.transformer.attn_weight = 0.1
+        #     elif args.attn_forcing == 'None':
+        #         logger.info('No attention forcing is used')
+        #         model.transformer.attn_forcing = False
+        #     run_epoch()
+        #     valid_iterator = get_iterator('cs', 'valid')
+        #     model.transformer.attn_forcing = False
+        #     val_loss = evaluate(valid_iterator)
+        #     logger.info('-' * 89)
+        #     logger.info('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
+        #                 'valid_en ppl {:8.2f} |'.format(
+        #         epoch + 1, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
+        #     logger.info('-' * 89)
+        #
+        #     torch.save(model.state_dict(), args.model + '_train.pt')
+        #     logger.info('Saving model')
+        #
+        #     # for temp in [0.7, 1, 10, 100]:
+        #     #     generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
+        #     #     generated = generated.cpu().numpy()
+        #     #     generated_word = []
+        #     #     for l in generated:
+        #     #         for x in l:
+        #     #             generated_word.append(data['dictionary'].id2word[x])
+        #     #         generated_word.append('\n')
+        #     #     logger.debug(' '.join(generated_word))
+        #
+        #     if val_loss < stored_loss:
+        #         torch.save(model.state_dict(), args.model + '_valid.pt')
+        #         logger.info('Saving model (new best validation)')
+        #         stored_loss = val_loss
+        #
+        #         # Run on test data.
+        #         test_iterator = get_iterator('cs', 'test')
+        #         test_loss = evaluate(test_iterator)
+        #         logger.debug('=' * 89)
+        #         logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+        #             test_loss, math.exp(test_loss)))
+        #         logger.debug('=' * 89)
+        #         # Run on test data.
+        #         test_iterator = get_iterator('cs', 'test_cs')
+        #         test_loss = evaluate(test_iterator)
+        #         logger.debug('=' * 89)
+        #         logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+        #             test_loss, math.exp(test_loss)))
+        #         logger.debug('=' * 89)
+        #         # Run on test data.
+        #         test_iterator = get_iterator('cs', 'test_en')
+        #         test_loss = evaluate(test_iterator)
+        #         logger.debug('=' * 89)
+        #         logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+        #             test_loss, math.exp(test_loss)))
+        #         logger.debug('=' * 89)
+        #         # Run on test data.
+        #         test_iterator = get_iterator('cs', 'test_zh')
+        #         test_loss = evaluate(test_iterator)
+        #         logger.debug('=' * 89)
+        #         logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+        #             test_loss, math.exp(test_loss)))
+        #         logger.debug('=' * 89)
+        #
+        #     # if len(best_val_loss) > 17 and val_loss > min(best_val_loss[:-5]):
+        #     #     logger.info('Early stop')
+        #     #     break
+        #
+        #     best_val_loss.append(val_loss)
 
         # adaptation using train
         model.load_state_dict(torch.load(args.model + '_train.pt'))
