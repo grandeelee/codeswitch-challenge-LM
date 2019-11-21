@@ -464,15 +464,15 @@ if __name__ == '__main__':
                 epoch, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
             logger.info('-' * 89)
 
-            for temp in [0.7, 1, 10, 100]:
-                generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
-                generated = generated.cpu().numpy()
-                generated_word = []
-                for l in generated:
-                    for x in l:
-                        generated_word.append(data['dictionary'].id2word[x])
-                    generated_word.append('\n')
-                logger.debug(' '.join(generated_word))
+            # for temp in [0.7, 1, 10, 100]:
+            #     generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
+            #     generated = generated.cpu().numpy()
+            #     generated_word = []
+            #     for l in generated:
+            #         for x in l:
+            #             generated_word.append(data['dictionary'].id2word[x])
+            #         generated_word.append('\n')
+            #     logger.debug(' '.join(generated_word))
 
             if val_loss < stored_loss:
                 torch.save(model.state_dict(), args.model + '_train_adapt.pt')
