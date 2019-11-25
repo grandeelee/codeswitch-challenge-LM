@@ -177,10 +177,10 @@ def run_epoch():
             lm_losses = criterion(lm_logits, y)
             prev_losses = criterion(previous_lm_logits, y)
             lm_losses = lm_losses.sum() / torch.sum(pred_mask)
-            prev_losses = prev_losses.sum() / torch.sum(pred_mask) * 0.5
+            prev_losses = prev_losses.sum() / torch.sum(pred_mask)
+            two_layer_loss = lm_losses + 0.5 * prev_losses
             n_words += torch.sum(pred_mask)
-            lm_losses.backward()
-            prev_losses.backward()
+            two_layer_loss.backward()
             model_opt.step()
             total_loss += lm_losses.data * torch.sum(pred_mask)
 
@@ -213,10 +213,10 @@ def run_epoch():
             lm_losses = criterion(lm_logits, y)
             prev_losses = criterion(previous_lm_logits, y)
             lm_losses = lm_losses.sum() / torch.sum(pred_mask)
-            prev_losses = prev_losses.sum() / torch.sum(pred_mask) * 0.5
+            prev_losses = prev_losses.sum() / torch.sum(pred_mask)
+            two_layer_loss = lm_losses + 0.5 * prev_losses
             n_words += torch.sum(pred_mask)
-            lm_losses.backward()
-            prev_losses.backward()
+            two_layer_loss.backward()
             model_opt.step()
             total_loss += lm_losses.data * torch.sum(pred_mask)
 
