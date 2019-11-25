@@ -122,6 +122,72 @@ def run_epoch():
     for batch in tqdm(range(epoch_size), ncols=100):
         for direction in args.directions:
             # generate batch
+            x, lengths = get_batch('train', ('en', 'zh'), direction)
+
+            # for sent in x:
+            #     x_word = [data['dictionary'][i.item()] for i in sent]
+            #     logger.debug('{}'.format(' '.join(x_word)))
+
+            # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
+            alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
+            # -1 minus away the bos index, target is the sent and </s>
+            pred_mask = alen[None] < lengths[:, None] - 1
+            # if params.context_size > 0:  # do not predict without context
+            #     pred_mask[:params.context_size] = 0
+            # select target to be first word until eos
+            y = x[:, 1:].masked_select(pred_mask[:, :-1])
+            assert pred_mask.sum().item() == y.size(0)
+
+            x = x.to(device)
+            pred_mask = pred_mask.to(device)
+            y = y.to(device)
+
+            # forward / loss
+            model.train()
+            model_opt.zero_grad()
+            lm_logits = model(x)
+            lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
+
+            lm_losses = criterion(lm_logits, y)
+            lm_losses = lm_losses.sum() / torch.sum(pred_mask)
+            n_words += torch.sum(pred_mask)
+            lm_losses.backward()
+            model_opt.step()
+            total_loss += lm_losses.data * torch.sum(pred_mask)
+
+            x, lengths = get_batch('train', ('zh', 'en'), direction)
+
+            # for sent in x:
+            #     x_word = [data['dictionary'][i.item()] for i in sent]
+            #     logger.debug('{}'.format(' '.join(x_word)))
+
+            # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
+            alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
+            # -1 minus away the bos index, target is the sent and </s>
+            pred_mask = alen[None] < lengths[:, None] - 1
+            # if params.context_size > 0:  # do not predict without context
+            #     pred_mask[:params.context_size] = 0
+            # select target to be first word until eos
+            y = x[:, 1:].masked_select(pred_mask[:, :-1])
+            assert pred_mask.sum().item() == y.size(0)
+
+            x = x.to(device)
+            pred_mask = pred_mask.to(device)
+            y = y.to(device)
+
+            # forward / loss
+            model.train()
+            model_opt.zero_grad()
+            lm_logits = model(x)
+            lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
+
+            lm_losses = criterion(lm_logits, y)
+            lm_losses = lm_losses.sum() / torch.sum(pred_mask)
+            n_words += torch.sum(pred_mask)
+            lm_losses.backward()
+            model_opt.step()
+            total_loss += lm_losses.data * torch.sum(pred_mask)
+
             x, lengths = get_batch('cs', 'train', direction)
 
             # for sent in x:
@@ -266,7 +332,7 @@ if __name__ == '__main__':
     model = LMModel(args, args.vocab_size)
     criterion = nn.CrossEntropyLoss(reduction='none')
 
-    n_updates_total = args.sent_per_epoch * args.epochs * len(args.directions)
+    n_updates_total = args.sent_per_epoch * 3 * args.epochs * len(args.directions)
     model_opt = OpenAIAdam(model.parameters(),
                            lr=args.lr,
                            schedule=args.lr_schedule,
