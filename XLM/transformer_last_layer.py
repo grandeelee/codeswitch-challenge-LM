@@ -213,8 +213,8 @@ class TransformerModel(nn.Module):
         h = self.lockdrop(e)
         for i, block in enumerate(self.h):
             h = block(h, idx, self.attn_weight, self.attn_forcing)
-            if i == self.n_layer -1:
-                l =  block(h, idx, self.attn_weight, self.attn_forcing)
+            if i == self.n_layer - 1:
+                l = block(h, idx, self.attn_weight, self.attn_forcing)
         return l, h
 
 
