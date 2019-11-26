@@ -106,7 +106,7 @@ def evaluate(generator):
 
         model.eval()
         model_opt.zero_grad()
-        lm_logits = model(x)
+        lm_logits, _ = model(x)
         lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
         lm_losses = criterion(lm_logits, y)
         lm_losses = lm_losses.sum() / torch.sum(pred_mask)
