@@ -19,6 +19,7 @@ n_gpu = torch.cuda.device_count()
 
 # ============== data set preparation ======================
 contextualized_embeds = []
+embedding_layer = []
 dico = torch.load('dico.pth')
 args.vocab_size = len(dico)
 input_test = '请 用 lower case only and 长 度 not longer than 70'
@@ -33,12 +34,12 @@ def get_embed(self, input, output):
     # output is a Tensor. output.data is the Tensor we are interested
     contextualized_embeds.append(output.data)
 
+
 if __name__ == '__main__':
 
     model = LMModel(args, args.vocab_size, args.n_ctx)
     model.to(device)
     x = input.to(device)
-
     model.load_state_dict(torch.load('xlm_baseline_mix_adapt.pt'))
     model.transformer.h._modules['0'].register_forward_hook(get_embed)
     model.transformer.h._modules['1'].register_forward_hook(get_embed)
@@ -61,5 +62,5 @@ if __name__ == '__main__':
     # the embedding for the first word can be a concatenation of all the 12 layers
     first_word = []
     for embed in contextualized_embeds:
-        first_word.append(embed[0, 0, :])
+        first_word.append(embed[0, 0, 12*2:12*3])
 
