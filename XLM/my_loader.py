@@ -205,3 +205,7 @@ def load_data(params):
 
     logger.info("")
     return data
+
+
+if __name__ == '__main__':
+    data = torch.load('/home/grandee/projects/LM/data/cs_para/test.pth')
