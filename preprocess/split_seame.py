@@ -45,14 +45,14 @@ def split_en_zh_cs(data):
 
 def split_train_valid_test(data):
     total = get_num_lines(data)
-    split = total // 3
+    split = total // 20
     with open(data, 'r', encoding='utf-8') as f:
         text = f.read().split('\n')
     random.shuffle(text)
 
-    valid = text[:split]
-    test = text[split:split * 2]
-    train = text[split * 2:]
+    valid = text[:split*18]
+    test = text[split*18:split*19]
+    train = text[split*19:]
 
     with open(data + '.valid', 'w', encoding='utf-8') as f:
         f.writelines(l + '\n' for l in valid)
@@ -63,7 +63,7 @@ def split_train_valid_test(data):
 
 
 if __name__ == '__main__':
-    data = '../data/cs_big/cs'
+    data = '/home/grandee/projects/LM/data/cs_benchmarking/seame.full'
     split_train_valid_test(data)
-    data = '../data/cs_big/cs.test'
+    data = '/home/grandee/projects/LM/data/cs_benchmarking/seame.full.test'
     split_en_zh_cs(data)
