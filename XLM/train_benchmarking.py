@@ -230,6 +230,7 @@ if __name__ == '__main__':
     try:
         # adaptation using train
         model.load_state_dict(torch.load(args.model + '_train.pt'))
+        logger.info('loaded model from {}'.format(args.model + '_train.pt'))
         model.transformer.attn_forcing = False
         n_updates_total = args.sent_per_epoch * args.adapt_epochs * len(args.directions)
         model_opt = OpenAIAdam(model.parameters(),
@@ -298,6 +299,7 @@ if __name__ == '__main__':
 
         # adaptation using valid
         model.load_state_dict(torch.load(args.model + '_valid.pt'))
+        logger.info('loaded model from {}'.format(args.model + '_valid.pt'))
         n_updates_total = args.sent_per_epoch * args.adapt_epochs * len(args.directions)
         model_opt = OpenAIAdam(model.parameters(),
                                lr=args.lr,
