@@ -31,13 +31,13 @@ logger.info("device: {} n_gpu: {}".format(device, n_gpu))
 
 # ============== data set preparation ======================
 args.batch_size = args.batch_size * max(n_gpu, 1)
-args.log_interval = args.epoch_size // 10
 check_data_params(args)
 # load data
 data = load_data(args)
 args.vocab_size = len(data['dictionary'])
 args.sent_per_epoch = len(data['cs']['train'])
 args.epoch_size = args.sent_per_epoch // args.batch_size
+args.log_interval = args.epoch_size // 10
 assert args.max_len + 2 <= args.n_ctx, 'sequence length cannot accommodate max sent length'
 if args.bidirectional:
     args.directions = ['forward', 'backward']
