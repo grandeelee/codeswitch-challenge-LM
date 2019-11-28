@@ -51,6 +51,8 @@ if __name__ == '__main__':
 
     # for file in files:
     for file in files:
+        if file.split('/')[-1] in ['all_en', 'all_zh']:
+            continue
         data = dico.index_data(dico, file, file + '.pth')
         logger.info("%i words (%i unique) in %i sentences." % (
             len(data['sentences']) - len(data['positions']),
@@ -66,21 +68,37 @@ if __name__ == '__main__':
             if len(data['unk_words']) < 30:
                 for w, c in sorted(data['unk_words'].items(), key=lambda x: x[1])[::-1]:
                     logger.info("%s: %i" % (w, c))
-
-
-    # bin_path = '../data/cs_para/para.zh-en.pth'
-    # data = dico.index_para(dico, path_2, path_1, bin_path)
-    # logger.info("%i words (%i unique) in %i sentences." % (
-    #     len(data['sentences']) - len(data['positions']),
-    #     len(data['dictionary']),
-    #     len(data['positions'])
-    # ))
-    # if len(data['unk_words']) > 0:
-    #     logger.info("%i unknown words (%i unique), covering %.2f%% of the data." % (
-    #         sum(data['unk_words'].values()),
-    #         len(data['unk_words']),
-    #         sum(data['unk_words'].values()) * 100. / (len(data['sentences']) - len(data['positions']))
-    #     ))
-    #     if len(data['unk_words']) < 30:
-    #         for w, c in sorted(data['unk_words'].items(), key=lambda x: x[1])[::-1]:
-    #             logger.info("%s: %i" % (w, c))
+    path_1 = '/home/grandee/projects/LM/data/huge_data/all_en'
+    path_2 = '/home/grandee/projects/LM/data/huge_data/all_zh'
+    bin_path_1 = '../data/huge_data/para.zh-en.pth'
+    bin_path_2 = '../data/huge_data/para.en-zh.pth'
+    data = dico.index_para(dico, path_2, path_1, bin_path_1)
+    logger.info("%i words (%i unique) in %i sentences." % (
+        len(data['sentences']) - len(data['positions']),
+        len(data['dictionary']),
+        len(data['positions'])
+    ))
+    if len(data['unk_words']) > 0:
+        logger.info("%i unknown words (%i unique), covering %.2f%% of the data." % (
+            sum(data['unk_words'].values()),
+            len(data['unk_words']),
+            sum(data['unk_words'].values()) * 100. / (len(data['sentences']) - len(data['positions']))
+        ))
+        if len(data['unk_words']) < 30:
+            for w, c in sorted(data['unk_words'].items(), key=lambda x: x[1])[::-1]:
+                logger.info("%s: %i" % (w, c))
+    data = dico.index_para(dico, path_1, path_2, bin_path_2)
+    logger.info("%i words (%i unique) in %i sentences." % (
+        len(data['sentences']) - len(data['positions']),
+        len(data['dictionary']),
+        len(data['positions'])
+    ))
+    if len(data['unk_words']) > 0:
+        logger.info("%i unknown words (%i unique), covering %.2f%% of the data." % (
+            sum(data['unk_words'].values()),
+            len(data['unk_words']),
+            sum(data['unk_words'].values()) * 100. / (len(data['sentences']) - len(data['positions']))
+        ))
+        if len(data['unk_words']) < 30:
+            for w, c in sorted(data['unk_words'].items(), key=lambda x: x[1])[::-1]:
+                logger.info("%s: %i" % (w, c))
