@@ -284,7 +284,7 @@ def write(words, m, file):
 
 
 def evaluator(args, dico):
-    model = LMModel(args, args.vocab_size, 70)
+    model = LMModel(args, args.vocab_size)
     criterion = nn.CrossEntropyLoss(reduction='none')
 
     logger.info("Model: {}".format(model))
@@ -411,7 +411,7 @@ def evaluator(args, dico):
 
 
 if __name__ == '__main__':
-    model_paths = ['/home/grandee/projects/LM/save/mono_only_valid_adapt']
+    model_paths = ['/home/grandee/projects/LM/save/xlm_interspeech_include_mono_valid_adapt']
 
     for path in model_paths:
         args.model = path

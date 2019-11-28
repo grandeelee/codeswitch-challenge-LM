@@ -331,6 +331,7 @@ class Dictionary(object):
             # skip empty sentences
             if len(s) == 0:
                 logger.debug("Empty sentence in line %i." % i)
+                continue
             # index sentence words
             count_unk = 0
             indexed = []

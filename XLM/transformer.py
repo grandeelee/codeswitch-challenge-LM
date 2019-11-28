@@ -179,14 +179,14 @@ class TransformerModel(nn.Module):
     def __init__(self, cfg, vocab=10):
         super(TransformerModel, self).__init__()
         self.vocab = vocab
-        self.position_embed = cfg.pos_embed
+        self.pos_embed = cfg.pos_embed
         self.sin_embed = cfg.sin_embed
         self.attn_weight = 1.0
         self.attn_forcing = False
         self.embed = nn.Embedding(vocab, cfg.emsize)
-        self.pos_embed = nn.Embedding(cfg.n_ctx, cfg.emsize)
+        self.position_embed = nn.Embedding(cfg.n_ctx, cfg.emsize)
         if self.sin_embed:
-            create_sinusoidal_embeddings(cfg.n_ctx, cfg.emsize, out=self.pos_embed.weight)
+            create_sinusoidal_embeddings(cfg.n_ctx, cfg.emsize, out=self.position_embed.weight)
         # dropout try LSTM regularize paper
         # self.drop = nn.Dropout(cfg.embd_pdrop)
         self.drop = cfg.embd_pdrop
@@ -201,12 +201,12 @@ class TransformerModel(nn.Module):
             idx = idx[idx.nonzero()][:, 0]
         else:
             idx = None
-        if self.position_embed or self.sin_embed:
+        if self.pos_embed or self.sin_embed:
             pos = x[:, :, 1]
             x = x[:, :, 0]
         e = embedded_dropout(self.embed, x, dropout=self.drop if self.training else 0)
         # Add the position information to the input embeddings
-        if self.position_embed or self.sin_embed:
+        if self.pos_embed or self.sin_embed:
             p = embedded_dropout(self.position_embed, pos, dropout=self.drop if self.training else 0)
             e = e + p
         h = self.lockdrop(e)
