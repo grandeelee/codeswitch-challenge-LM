@@ -23,7 +23,7 @@ from my_dictionary import Dictionary
 
 if __name__ == '__main__':
 
-    logger = create_logger('../save/huge_vocab.log')
+    logger = create_logger('../data/huge_data/vocab.log')
     # list all datasets in the data/ directory
     # data_path = '../data/mono/'
     files = []
@@ -39,13 +39,14 @@ if __name__ == '__main__':
             files.append(p)
     # build vocab from corpus or vocab list
     dico = Dictionary()
-    if os.path.isfile('../data/huge_data/xlm_vocab.count'):
+    if os.path.isfile('../data/huge_data/vocab.count'):
         logger.info("reading from vocab.count")
-        dico.from_vocab('../data/huge_data/xlm_vocab.count')
+        dico.from_vocab('../data/huge_data/vocab.count')
     else:
         logger.info("building vocab from corpus")
         dico.from_corpus(files)
-        dico.write_vocab('../data/huge_data/xlm_vocab.count')
+        dico.max_vocab(50000)
+        dico.write_vocab('../data/huge_data/vocab.count')
     logger.info("")
 
     # for file in files:

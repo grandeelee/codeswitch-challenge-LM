@@ -248,10 +248,12 @@ class Dictionary(object):
             # skip empty sentences
             if len(s_1) == 0:
                 logger.debug("Empty sentence in line %i." % i)
+                continue
             s_2 = line_2.rstrip().split()
             # skip empty sentences
             if len(s_2) == 0:
                 logger.debug("Empty sentence in line %i." % i)
+                continue
 
             count_unk = 0
             indexed = []
