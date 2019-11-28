@@ -426,7 +426,7 @@ if __name__ == '__main__':
 
         # adaptation using train
         model.load_state_dict(torch.load(args.model + '_train.pt'))
-        n_updates_total = (len(data['cs']['adapt']) // args.batch_size) * args.adapt_epochs
+        n_updates_total = (len(data['cs']['train']) // args.batch_size) * args.adapt_epochs
         model_opt = OpenAIAdam(model.parameters(),
                                lr=args.lr,
                                schedule=args.lr_schedule,
@@ -443,7 +443,7 @@ if __name__ == '__main__':
         model.transformer.attn_forcing = False
         for epoch in range(args.adapt_epochs):
             epoch_start_time = time.time()
-            run_adapt_epoch('cs', 'adapt')
+            run_adapt_epoch('cs', 'train')
             valid_iterator = get_iterator('cs', 'valid')
             val_loss = evaluate(valid_iterator)
             logger.info('-' * 89)
@@ -503,7 +503,7 @@ if __name__ == '__main__':
 
         # adaptation using valid
         model.load_state_dict(torch.load(args.model + '_valid.pt'))
-        n_updates_total = (len(data['cs']['adapt']) // args.batch_size) * args.adapt_epochs
+        n_updates_total = (len(data['cs']['train']) // args.batch_size) * args.adapt_epochs
         model_opt = OpenAIAdam(model.parameters(),
                                lr=args.lr,
                                schedule=args.lr_schedule,
@@ -520,7 +520,7 @@ if __name__ == '__main__':
         model.transformer.attn_forcing = False
         for epoch in range(args.adapt_epochs):
             epoch_start_time = time.time()
-            run_adapt_epoch('cs', 'adapt')
+            run_adapt_epoch('cs', 'train')
             valid_iterator = get_iterator('cs', 'valid')
             val_loss = evaluate(valid_iterator)
             logger.info('-' * 89)
