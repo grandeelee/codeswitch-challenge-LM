@@ -97,7 +97,7 @@ def load_mono_data(params, data):
         get_iterator()
     """
     data['cs'] = {}
-    for splt in ['valid', 'test', 'adapt', 'test_cs', 'test_zh', 'test_en']:
+    for splt in ['valid', 'test', 'train', 'test_cs', 'test_zh', 'test_en']:
         data['cs'][splt] = {}
         # load data / update dictionary parameters / update data
         mono_data = load_binarized(params.mono_dataset[splt], params)
