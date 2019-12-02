@@ -116,25 +116,6 @@ def evaluate(generator):
     return total_loss / n_words
 
 
-def concat_batches(x1, len1, x2, len2, pad_idx, eos_idx):
-    """
-    Concat batches with different languages.
-    """
-    lengths = len1 + len2
-    slen, bs = lengths.max().item(), lengths.size(0)
-
-    x = x1.new(bs, slen).fill_(pad_idx)
-    x[:, :len1.max().item()].copy_(x1)
-
-    for i in range(bs):
-        l1 = len1[i]
-        x[i, l1:l1 + len2[i]].copy_(x2[i, :len2[i]])
-
-    assert (x == eos_idx).long().sum().item() == 2 * bs
-
-    return x, lengths
-
-
 def run_epoch():
     total_loss = 0
     start_time = time.time()
@@ -146,11 +127,6 @@ def run_epoch():
             # generate batch
             x, lengths = get_batch('train', ('en', 'zh'), direction)
 
-            # for sent in x:
-            #     x_word = [data['dictionary'][i.item()] for i in sent]
-            #     logger.debug('{}'.format(' '.join(x_word)))
-
-            # x, lengths = concat_batches(x1, lengths1, x2, lengths2, args.pad_index, args.eos_index)
             alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
             # -1 minus away the bos index, target is the sent and </s>
             pred_mask = alen[None] < lengths[:, None] - 1
@@ -159,13 +135,16 @@ def run_epoch():
             # select target to be first word until eos
             if args.pos_embed or args.sin_embed:
                 y = x[:, 1:, 0].masked_select(pred_mask[:, :-1])
+                y_1 = torch.cat((x[:, 2:, 0], x[:, 0, 0].unsqueeze(-1)), dim=-1).masked_select(pred_mask[:, :-1])
             else:
                 y = x[:, 1:].masked_select(pred_mask[:, :-1])
+                y_1 = torch.cat((x[:, 2:], x[:, 0].unsqueeze(-1)), dim=-1).masked_select(pred_mask[:, :-1])
             assert pred_mask.sum().item() == y.size(0)
 
             x = x.to(device)
             pred_mask = pred_mask.to(device)
             y = y.to(device)
+            y_1 = y_1.to(device)
 
             # forward / loss
             model.train()
@@ -175,14 +154,18 @@ def run_epoch():
             previous_lm_logits = previous_lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
 
             lm_losses = criterion(lm_logits, y)
+            lm_losses_1 = criterion(lm_logits, y_1)
+
             prev_losses = criterion(previous_lm_logits, y)
-            lm_losses = lm_losses.sum() / torch.sum(pred_mask)
-            prev_losses = prev_losses.sum() / torch.sum(pred_mask)
-            two_layer_loss = lm_losses + 0.5 * prev_losses
+            prev_losses_1 = criterion(previous_lm_logits, y_1)
+
+            losses = lm_losses + lm_losses_1 + prev_losses + prev_losses_1
+            losses = losses.sum() / torch.sum(pred_mask)
+
             n_words += torch.sum(pred_mask)
-            two_layer_loss.backward()
+            losses.backward()
             model_opt.step()
-            total_loss += lm_losses.data * torch.sum(pred_mask)
+            total_loss += losses.data * torch.sum(pred_mask)
 
             # generate batch
             x, lengths = get_batch('train', ('zh', 'en'), direction)
@@ -195,8 +178,10 @@ def run_epoch():
             # select target to be first word until eos
             if args.pos_embed or args.sin_embed:
                 y = x[:, 1:, 0].masked_select(pred_mask[:, :-1])
+                y_1 = torch.cat((x[:, 2:, 0], x[:, 0, 0].unsqueeze(-1)), dim=-1).masked_select(pred_mask[:, :-1])
             else:
                 y = x[:, 1:].masked_select(pred_mask[:, :-1])
+                y_1 = torch.cat((x[:, 2:], x[:, 0].unsqueeze(-1)), dim=-1).masked_select(pred_mask[:, :-1])
             assert pred_mask.sum().item() == y.size(0)
 
             x = x.to(device)
@@ -211,14 +196,18 @@ def run_epoch():
             previous_lm_logits = previous_lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
 
             lm_losses = criterion(lm_logits, y)
+            lm_losses_1 = criterion(lm_logits, y_1)
+
             prev_losses = criterion(previous_lm_logits, y)
-            lm_losses = lm_losses.sum() / torch.sum(pred_mask)
-            prev_losses = prev_losses.sum() / torch.sum(pred_mask)
-            two_layer_loss = lm_losses + 0.5 * prev_losses
+            prev_losses_1 = criterion(previous_lm_logits, y_1)
+
+            losses = lm_losses + lm_losses_1 + prev_losses + prev_losses_1
+            losses = losses.sum() / torch.sum(pred_mask)
+
             n_words += torch.sum(pred_mask)
-            two_layer_loss.backward()
+            losses.backward()
             model_opt.step()
-            total_loss += lm_losses.data * torch.sum(pred_mask)
+            total_loss += losses.data * torch.sum(pred_mask)
 
         if batch % args.log_interval == 0 and batch > 0:
             cur_loss = total_loss / n_words
@@ -264,15 +253,23 @@ def run_adapt_epoch(iter_name, data_set):
             # forward / loss
             model.train()
             model_opt.zero_grad()
-            lm_logits, _ = model(x)
+            lm_logits, previous_lm_logits = model(x)
             lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
+            previous_lm_logits = previous_lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
 
             lm_losses = criterion(lm_logits, y)
-            lm_losses = lm_losses.sum() / torch.sum(pred_mask)
+            lm_losses_1 = criterion(lm_logits, y_1)
+
+            prev_losses = criterion(previous_lm_logits, y)
+            prev_losses_1 = criterion(previous_lm_logits, y_1)
+
+            losses = lm_losses + lm_losses_1 + prev_losses + prev_losses_1
+            losses = losses.sum() / torch.sum(pred_mask)
+
             n_words += torch.sum(pred_mask)
-            lm_losses.backward()
+            losses.backward()
             model_opt.step()
-            total_loss += lm_losses.data * torch.sum(pred_mask)
+            total_loss += losses.data * torch.sum(pred_mask)
 
         if batch % args.log_interval == 0 and batch > 0:
             cur_loss = total_loss / n_words
@@ -284,50 +281,6 @@ def run_adapt_epoch(iter_name, data_set):
             total_loss = 0
             n_words = 0
             start_time = time.time()
-
-
-def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
-    """ Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
-        Args:
-            logits: logits distribution shape (vocabulary size)
-            top_k > 0: keep only top k tokens with highest probability (top-k filtering).
-            top_p > 0.0: keep the top tokens with cumulative probability >= top_p (nucleus filtering).
-                Nucleus filtering is described in Holtzman et al. (http://arxiv.org/abs/1904.09751)
-        From: https://gist.github.com/thomwolf/1a5a29f6962089e871b94cbd09daf317
-    """
-    # assert logits.dim() == 1  # batch size 1 for now - could be updated for more but the code would be less clear
-    top_k = min(top_k, logits.size(-1))  # Safety check
-    if top_k > 0:
-        # Remove all tokens with a probability less than the last token of the top-k
-        indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
-        logits[indices_to_remove] = filter_value
-
-    if top_p > 0.0:
-        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-
-        # Remove tokens with cumulative probability above the threshold
-        sorted_indices_to_remove = cumulative_probs > top_p
-        # Shift the indices to the right to keep also the first token above the threshold
-        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-        sorted_indices_to_remove[..., 0] = 0
-
-        indices_to_remove = sorted_indices[sorted_indices_to_remove]
-        logits[indices_to_remove] = filter_value
-    return logits
-
-
-def sample_sequence(args, model, length, temperature=1000, top_k=20, top_p=0.0):
-    bos_idx = data['dictionary'].word2id['<s>']
-    context = torch.full((args.batch_size, 1), bos_idx, dtype=torch.long).to(device)
-    with torch.no_grad():
-        for _ in tqdm(range(length)):
-            outputs = model(context)
-            next_token_logits = outputs[:, -1, :] / temperature
-            filtered_logits = F.softmax(top_k_top_p_filtering(next_token_logits, top_k=top_k, top_p=top_p), dim=-1)
-            next_token = torch.multinomial(filtered_logits, num_samples=1)
-            context = torch.cat((context, next_token), dim=1)
-    return context
 
 
 if __name__ == '__main__':
@@ -393,16 +346,6 @@ if __name__ == '__main__':
 
             torch.save(model.state_dict(), args.model + '_train.pt')
             logger.info('Saving model')
-
-            # for temp in [0.7, 1, 10, 100]:
-            #     generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
-            #     generated = generated.cpu().numpy()
-            #     generated_word = []
-            #     for l in generated:
-            #         for x in l:
-            #             generated_word.append(data['dictionary'].id2word[x])
-            #         generated_word.append('\n')
-            #     logger.debug(' '.join(generated_word))
 
             if val_loss < stored_loss:
                 torch.save(model.state_dict(), args.model + '_valid.pt')
@@ -472,16 +415,6 @@ if __name__ == '__main__':
                 epoch, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
             logger.info('-' * 89)
 
-            # for temp in [0.7, 1, 10, 100]:
-            #     generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
-            #     generated = generated.cpu().numpy()
-            #     generated_word = []
-            #     for l in generated:
-            #         for x in l:
-            #             generated_word.append(data['dictionary'].id2word[x])
-            #         generated_word.append('\n')
-            #     logger.debug(' '.join(generated_word))
-
             if val_loss < stored_loss:
                 torch.save(model.state_dict(), args.model + '_train_adapt.pt')
                 logger.info('Saving model (new best validation)')
@@ -548,16 +481,6 @@ if __name__ == '__main__':
                         'valid ppl {:8.2f} |'.format(
                 epoch, (time.time() - epoch_start_time), val_loss, math.exp(val_loss)))
             logger.info('-' * 89)
-
-            # for temp in [0.7, 1, 10, 100]:
-            #     generated = sample_sequence(args, model, args.n_ctx, temperature=temp)
-            #     generated = generated.cpu().numpy()
-            #     generated_word = []
-            #     for l in generated:
-            #         for x in l:
-            #             generated_word.append(data['dictionary'].id2word[x])
-            #         generated_word.append('\n')
-            #     logger.debug(' '.join(generated_word))
 
             if val_loss < stored_loss:
                 torch.save(model.state_dict(), args.model + '_valid_adapt.pt')
