@@ -18,7 +18,7 @@ from my_loader_newsplit import load_mono_data, check_data_params
 
 args = get_args()
 args.nlayers = 12
-args.gpus = '0'
+args.gpus = '3'
 # ================= initialization ========================
 # random.seed(args.seed)
 # np.random.seed(args.seed)
@@ -140,14 +140,16 @@ def getLangMask(dico):
             num_mask.append(False)
 
     num_mask = torch.tensor(num_mask, dtype=torch.bool)
-    en_mask[2:14] = [False for _ in range(12)]
+    en_mask[:14] = [False for _ in range(14)]
     en_mask = torch.tensor(en_mask, dtype=torch.bool)
     en_mask[num_mask] = False
 
-    zh_mask[2:14] = [False for _ in range(12)]
+    zh_mask[:14] = [False for _ in range(14)]
     zh_mask = torch.tensor(zh_mask, dtype=torch.bool)
     zh_mask[num_mask] = False
 
+    # with open('is_mask_correct', 'w', encoding='utf-8') as f:
+    #     f.writelines('{}: {}\n'.format(j, k) for j, k in zip(en_mask, dico.word2id.keys()))
     return en_mask, zh_mask
 
 
@@ -295,26 +297,72 @@ def sample_sequence(args, model, dico, length, temperature=1000, top_k=20, top_p
     return context
 
 
-def beam_search_norm_auto(x, mask):
+def beam_search_norm_auto(model, x, mask, b=10):
     with torch.no_grad():
         assert x.size(0) == 1, 'input sent by sent'
         predict_marker = mask[x[0]]
-        sequences = []
+        sequences = torch.tensor([], dtype=torch.long, device=device)
         for i, marker in enumerate(predict_marker):
-            if not marker:
-                if len(sequences) == 0:
-                    context = x[:, :i]
-                    sequences = context.repeat(10, 1)
-                else:
-                    context = sequences
-
-                outputs = model(context)
+            if marker:
+                outputs = model(sequences)
                 next_token_logits = outputs[:, -1, :]
-                next_token_logits[0][mask] = next_token_logits[0][mask] - float('Inf')
-                sorted_logit = torch.argsort(F.softmax(next_token_logits), -1, descending=True)
-                sequences = torch.cat((sequences, sorted_logit[0, :10].unsqueeze(-1)), dim=-1)
+                next_token_logits[:, mask] = next_token_logits[:, mask] - float('Inf')
+                next_token_logits[:, 0:2] = next_token_logits[:, 0:2] - float('Inf')
+                sorted_logits, sorted_index = torch.sort(F.softmax(next_token_logits, dim=-1), dim=-1, descending=True)
+                sorted_token = sorted_index.flatten()[torch.argsort(sorted_logits.flatten(), descending=True)]
+                sequences = torch.cat((sequences, sorted_token[0:b].unsqueeze(-1)), dim=-1)
+            else:
+                sequences = torch.cat((sequences, x[0, i].repeat(b, 1)), dim=1)
 
-        return torch.cat((sequences[0, :], x[0, sequences.size(-1):]))
+    return sequences[0, :]
+
+
+def beam_search_norm_seq2seq(model, x, mask, b=10):
+    with torch.no_grad():
+        assert x.size(0) == 1, 'input sent by sent'
+        sequences = torch.cat((x[0, :].repeat(b, 1),
+                               torch.empty((b, 1), dtype=torch.long).fill_(0).to(device)), dim=-1)
+        for _ in range(33):
+            outputs = model(sequences)
+            next_token_logits = outputs[:, -1, :]
+            next_token_logits[:, mask] = next_token_logits[:, mask] - float('Inf')
+            next_token_logits[:, 0:2] = next_token_logits[:, 0:2] - float('Inf')
+            sorted_logits, sorted_index = torch.sort(F.softmax(next_token_logits, dim=-1), dim=-1, descending=True)
+            sorted_token = sorted_index.flatten()[torch.argsort(sorted_logits.flatten(), descending=True)]
+            sequences = torch.cat((sequences, sorted_token[0:b].unsqueeze(-1)), dim=-1)
+
+    return sequences[0, x.size(-1):]
+
+
+def cs_normalization(args, dico, lang, type, b=10):
+    # ================== CS normalization ============================
+    # 4) WER, normalization.
+    f = open(args.model + '_' + lang + type + '_cs_norm.txt', 'w', encoding='utf-8')
+    s = open(args.model + '_' + lang + type + '_cs_orig.txt', 'w', encoding='utf-8')
+    model = old_model(args, args.vocab_size, 70)
+    model.load_state_dict(torch.load(args.model + '.pt'))
+    model.to(device)
+    model.eval()
+
+    en_mask, zh_mask = getLangMask(dico)
+    if lang == 'en':
+        mask = zh_mask
+    else:
+        mask = en_mask
+    test_iterator = get_iterator('cs', 'test_cs')
+    epoch_size = len(data['cs']['test_cs'])
+    for x, lengths in tqdm(test_iterator, total=epoch_size):
+        x = x.to(device)
+        if type == 'auto':
+            sent = beam_search_norm_auto(model, x, mask, b).cpu().numpy()
+        if type == 'seq2seq':
+            sent = beam_search_norm_seq2seq(model, x, mask, b).cpu().numpy()
+        f.write(' '.join([dico[i] for i in sent[1:-1]]) + '\n')
+        f.flush()
+        s.write(' '.join([dico[i.item()] for i in x[0][1:-1]]) + '\n')
+        s.flush()
+    f.close()
+    s.close()
 
 
 def write(words, m, file):
@@ -457,27 +505,6 @@ def evaluator(args, dico):
     # logger.info('Embed saved to {}'.format(args.model + '_embed'))
 
 
-def cs_normalization(args, dico, lang):
-    # ================== CS normalization ============================
-    # 4) WER, normalization.
-    normalized_sent = []
-    args.batch_size = 1
-    data = {}
-    load_mono_data(args, data)
-    en_mask, zh_mask = getLangMask(dico)
-    if lang == 'en':
-        mask = en_mask
-    else:
-        mask = zh_mask
-    test_iterator = get_iterator('cs', 'test_cs')
-    for x, lengths in test_iterator:
-        sent = beam_search_norm_auto(x, mask)
-        normalized_sent.append(sent.numpy())
-
-    with open(args.model + '_' + lang + '_cs_norm.txt', 'w', encoding='utf-8') as f:
-        f.writelines(' '.join(i) + '\n' for l in normalized_sent for i in l[1:-1])
-
-
 if __name__ == '__main__':
     model_paths = ['/home/grandee/projects/LM/save/xlm_baseline_mix_adapt']
 
@@ -485,9 +512,9 @@ if __name__ == '__main__':
         args.model = path
         logger = create_logger(args.model + '_eval.log')
         # ============== data set preparation ======================
-        args.batch_size = 50
+        args.batch_size = 1
         args.n_ctx = 70
-        args.max_len = 68
+        args.max_len = 34
         check_data_params(args)
 
         # load data
@@ -502,7 +529,8 @@ if __name__ == '__main__':
             logger.info('{} : {}'.format(key, value))
         logger.info('------------------------------------------------')
 
-        model = old_model(args, args.vocab_size, 70)
         # evaluator(args, dico)
-        cs_normalization(args, dico, 'en')
-        cs_normalization(args, dico, 'zh')
+        cs_normalization(args, dico, 'en', 'auto', b=20)
+        cs_normalization(args, dico, 'zh', 'auto', b=20)
+        cs_normalization(args, dico, 'en', 'seq2seq', b=20)
+        cs_normalization(args, dico, 'zh', 'seq2seq', b=20)

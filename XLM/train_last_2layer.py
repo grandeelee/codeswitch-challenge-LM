@@ -267,7 +267,7 @@ def run_adapt_epoch(iter_name, data_set):
             prev_losses = criterion(previous_lm_logits, y)
             prev_losses_1 = criterion(previous_lm_logits, y_1)
 
-            losses = lm_losses + lm_losses_1 + prev_losses + prev_losses_1
+            losses = lm_losses + lm_losses_1 / 2 + prev_losses / 2 + prev_losses_1 / 4
             losses = losses.sum() / torch.sum(pred_mask)
 
             n_words += torch.sum(pred_mask)
