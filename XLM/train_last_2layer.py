@@ -187,6 +187,7 @@ def run_epoch():
             x = x.to(device)
             pred_mask = pred_mask.to(device)
             y = y.to(device)
+            y_1 = y_1.to(device)
 
             # forward / loss
             model.train()
@@ -242,13 +243,16 @@ def run_adapt_epoch(iter_name, data_set):
             # select target to be first word until eos
             if args.pos_embed or args.sin_embed:
                 y = x[:, 1:, 0].masked_select(pred_mask[:, :-1])
+                y_1 = torch.cat((x[:, 2:, 0], x[:, 0, 0].unsqueeze(-1)), dim=-1).masked_select(pred_mask[:, :-1])
             else:
                 y = x[:, 1:].masked_select(pred_mask[:, :-1])
+                y_1 = torch.cat((x[:, 2:], x[:, 0].unsqueeze(-1)), dim=-1).masked_select(pred_mask[:, :-1])
             assert pred_mask.sum().item() == y.size(0)
 
             x = x.to(device)
             pred_mask = pred_mask.to(device)
             y = y.to(device)
+            y_1 = y_1.to(device)
 
             # forward / loss
             model.train()
