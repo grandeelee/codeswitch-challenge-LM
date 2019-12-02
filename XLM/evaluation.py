@@ -99,7 +99,7 @@ def getMask(dict_path, args):
     return vocab_mask
 
 
-def getCSMask(dico, args):
+def getCSMask(dico):
     """
 
     :param dico:
@@ -121,6 +121,34 @@ def getCSMask(dico, args):
     # with open(args.model + '_cs_mask', 'w', encoding='utf-8') as f:
     #     f.writelines(str(i) + '\n' for i in cs_mask)
     return cs_mask, num_mask
+
+
+def getLangMask(dico):
+    en_mask = []
+    zh_mask = []
+    num_mask = []
+    for word in dico.word2id.keys():
+        if len(re.findall(r'[a-z]+', word)) > 0:
+            en_mask.append(True)
+            zh_mask.append(False)
+        else:
+            zh_mask.append(True)
+            en_mask.append(False)
+        if len(re.findall(r'\d', word)) > 0:
+            num_mask.append(True)
+        else:
+            num_mask.append(False)
+
+    num_mask = torch.tensor(num_mask, dtype=torch.bool)
+    en_mask[2:14] = [False for _ in range(12)]
+    en_mask = torch.tensor(en_mask, dtype=torch.bool)
+    en_mask[num_mask] = False
+
+    zh_mask[2:14] = [False for _ in range(12)]
+    zh_mask = torch.tensor(zh_mask, dtype=torch.bool)
+    zh_mask[num_mask] = False
+
+    return en_mask, zh_mask
 
 
 def maskLogits(logits, vocab_mask):
@@ -267,6 +295,28 @@ def sample_sequence(args, model, dico, length, temperature=1000, top_k=20, top_p
     return context
 
 
+def beam_search_norm_auto(x, mask):
+    with torch.no_grad():
+        assert x.size(0) == 1, 'input sent by sent'
+        predict_marker = mask[x[0]]
+        sequences = []
+        for i, marker in enumerate(predict_marker):
+            if not marker:
+                if len(sequences) == 0:
+                    context = x[:, :i]
+                    sequences = context.repeat(10, 1)
+                else:
+                    context = sequences
+
+                outputs = model(context)
+                next_token_logits = outputs[:, -1, :]
+                next_token_logits[0][mask] = next_token_logits[0][mask] - float('Inf')
+                sorted_logit = torch.argsort(F.softmax(next_token_logits), -1, descending=True)
+                sequences = torch.cat((sequences, sorted_logit[0, :10].unsqueeze(-1)), dim=-1)
+
+        return torch.cat((sequences[0, :], x[0, sequences.size(-1):]))
+
+
 def write(words, m, file):
     """
     take in a list of words and m is numpy array
@@ -284,7 +334,7 @@ def write(words, m, file):
 
 
 def evaluator(args, dico):
-    model = LMModel(args, args.vocab_size)
+    model = old_model(args, args.vocab_size, 70)
     criterion = nn.CrossEntropyLoss(reduction='none')
 
     logger.info("Model: {}".format(model))
@@ -379,7 +429,7 @@ def evaluator(args, dico):
 
     # ==================== token level PPL ========================================
     # token level ppl
-    cs_mask, _ = getCSMask(dico, args)
+    cs_mask, _ = getCSMask(dico)
     test_iterator = get_iterator('cs', 'test_cs')
     test_loss = token_ppl(model, criterion, test_iterator, cs_mask)
     logger.debug('=' * 89)
@@ -388,7 +438,7 @@ def evaluator(args, dico):
     logger.debug('=' * 89)
 
     # ================= Generator ====================================
-    cs_mask = getCSMask(dico, args)
+    cs_mask = getCSMask(dico)
     for temp in [0.7, 1]:  # , 10, 100]:
         for _ in range(10):
             generated = sample_sequence(args, model, dico, args.n_ctx, temperature=temp, mask=cs_mask)
@@ -406,12 +456,30 @@ def evaluator(args, dico):
     #     write(data['dictionary'].id2word.values(), matrix, args.model + '_embed')
     # logger.info('Embed saved to {}'.format(args.model + '_embed'))
 
+
+def cs_normalization(args, dico, lang):
     # ================== CS normalization ============================
     # 4) WER, normalization.
+    normalized_sent = []
+    args.batch_size = 1
+    data = {}
+    load_mono_data(args, data)
+    en_mask, zh_mask = getLangMask(dico)
+    if lang == 'en':
+        mask = en_mask
+    else:
+        mask = zh_mask
+    test_iterator = get_iterator('cs', 'test_cs')
+    for x, lengths in test_iterator:
+        sent = beam_search_norm_auto(x, mask)
+        normalized_sent.append(sent.numpy())
+
+    with open(args.model + '_' + lang + '_cs_norm.txt', 'w', encoding='utf-8') as f:
+        f.writelines(' '.join(i) + '\n' for l in normalized_sent for i in l[1:-1])
 
 
 if __name__ == '__main__':
-    model_paths = ['/home/grandee/projects/LM/save/xlm_interspeech_include_mono_valid_adapt']
+    model_paths = ['/home/grandee/projects/LM/save/xlm_baseline_mix_adapt']
 
     for path in model_paths:
         args.model = path
@@ -434,4 +502,7 @@ if __name__ == '__main__':
             logger.info('{} : {}'.format(key, value))
         logger.info('------------------------------------------------')
 
-        evaluator(args, dico)
+        model = old_model(args, args.vocab_size, 70)
+        # evaluator(args, dico)
+        cs_normalization(args, dico, 'en')
+        cs_normalization(args, dico, 'zh')
