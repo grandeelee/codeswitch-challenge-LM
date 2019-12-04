@@ -13,6 +13,7 @@ from options import get_args
 from logger import create_logger
 from transformer_ori import LMModel as old_model
 from transformer import LMModel
+
 from opt import OpenAIAdam
 from my_loader_newsplit import load_mono_data, check_data_params
 
@@ -382,7 +383,7 @@ def write(words, m, file):
 
 
 def evaluator(args, dico):
-    model = old_model(args, args.vocab_size, 70)
+    model = LMModel(args, args.vocab_size)
     criterion = nn.CrossEntropyLoss(reduction='none')
 
     logger.info("Model: {}".format(model))
@@ -499,22 +500,22 @@ def evaluator(args, dico):
             logger.debug(' '.join(generated_word))
 
     # # ================== BLI ========================================
-    # matrix = model.transformer.embed.weight.data.cpu().numpy()
-    # if not os.path.exists(args.model + '_embed'):
-    #     write(data['dictionary'].id2word.values(), matrix, args.model + '_embed')
-    # logger.info('Embed saved to {}'.format(args.model + '_embed'))
+    matrix = model.transformer.embed.weight.data.cpu().numpy()
+    if not os.path.exists(args.model + '_embed'):
+        write(data['dictionary'].id2word.values(), matrix, args.model + '_embed')
+    logger.info('Embed saved to {}'.format(args.model + '_embed'))
 
 
 if __name__ == '__main__':
-    model_paths = ['/home/grandee/projects/LM/save/xlm_baseline_mix_adapt']
+    model_paths = ['/home/grandee/projects/LM/save/mix_multi_words_target_train_adapt']
 
     for path in model_paths:
         args.model = path
         logger = create_logger(args.model + '_eval.log')
         # ============== data set preparation ======================
-        args.batch_size = 1
+        args.batch_size = 50
         args.n_ctx = 70
-        args.max_len = 34
+        args.max_len = 68
         check_data_params(args)
 
         # load data
@@ -529,8 +530,8 @@ if __name__ == '__main__':
             logger.info('{} : {}'.format(key, value))
         logger.info('------------------------------------------------')
 
-        # evaluator(args, dico)
-        cs_normalization(args, dico, 'en', 'auto', b=20)
-        cs_normalization(args, dico, 'zh', 'auto', b=20)
-        cs_normalization(args, dico, 'en', 'seq2seq', b=20)
-        cs_normalization(args, dico, 'zh', 'seq2seq', b=20)
+        evaluator(args, dico)
+        # cs_normalization(args, dico, 'en', 'auto', b=20)
+        # cs_normalization(args, dico, 'zh', 'auto', b=20)
+        # cs_normalization(args, dico, 'en', 'seq2seq', b=20)
+        # cs_normalization(args, dico, 'zh', 'seq2seq', b=20)

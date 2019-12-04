@@ -153,7 +153,7 @@ def run_epoch():
             lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
             lm_losses = criterion(lm_logits, y)
             lm_losses_1 = criterion(lm_logits, y_1)
-            losses = lm_losses + lm_losses_1
+            losses = lm_losses + lm_losses_1 * 0.5
             losses = losses.sum() / torch.sum(pred_mask)
             n_words += torch.sum(pred_mask)
 
@@ -190,7 +190,7 @@ def run_epoch():
             lm_logits = lm_logits[pred_mask].contiguous().view(-1, args.vocab_size)
             lm_losses = criterion(lm_logits, y)
             lm_losses_1 = criterion(lm_logits, y_1)
-            losses = lm_losses + lm_losses_1
+            losses = lm_losses + lm_losses_1 * 0.5
             losses = losses.sum() / torch.sum(pred_mask)
             n_words += torch.sum(pred_mask)
 
