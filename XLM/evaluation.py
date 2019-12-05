@@ -13,9 +13,7 @@ from options import get_args
 from logger import create_logger
 from transformer_ori import LMModel as old_model
 from transformer import LMModel
-
-from opt import OpenAIAdam
-from my_loader_newsplit import load_mono_data, check_data_params
+from my_loader_evaluation import load_mono_data, check_data_params
 
 args = get_args()
 args.nlayers = 12
@@ -44,7 +42,7 @@ def get_iterator(iter_name, data_set):
         [str(x) for x in [iter_name, data_set] if x is not None]))
 
     iterator = data[iter_name][data_set].get_iterator(
-        shuffle=True,
+        shuffle=False,
         group_by_size=False,
     )
 
@@ -305,15 +303,16 @@ def beam_search_norm_auto(model, x, mask, b=10):
         sequences = torch.tensor([], dtype=torch.long, device=device)
         for i, marker in enumerate(predict_marker):
             if marker:
-                outputs = model(sequences)
+                outputs = model(x[:, :i+1])
                 next_token_logits = outputs[:, -1, :]
                 next_token_logits[:, mask] = next_token_logits[:, mask] - float('Inf')
                 next_token_logits[:, 0:2] = next_token_logits[:, 0:2] - float('Inf')
-                sorted_logits, sorted_index = torch.sort(F.softmax(next_token_logits, dim=-1), dim=-1, descending=True)
-                sorted_token = sorted_index.flatten()[torch.argsort(sorted_logits.flatten(), descending=True)]
-                sequences = torch.cat((sequences, sorted_token[0:b].unsqueeze(-1)), dim=-1)
+                # sorted_logits, sorted_index = torch.sort(F.softmax(next_token_logits, dim=-1), dim=-1, descending=True)
+                # sorted_token = sorted_index.flatten()[torch.argsort(sorted_logits.flatten(), descending=True)]
+                sorted_token = torch.argmax(F.softmax(next_token_logits, dim=-1), dim=-1)
+                sequences = torch.cat((sequences, sorted_token.unsqueeze(-1)), dim=-1)
             else:
-                sequences = torch.cat((sequences, x[0, i].repeat(b, 1)), dim=1)
+                sequences = torch.cat((sequences, x[:, i]), dim=1)
 
     return sequences[0, :]
 
@@ -327,7 +326,7 @@ def beam_search_norm_seq2seq(model, x, mask, b=10):
             outputs = model(sequences)
             next_token_logits = outputs[:, -1, :]
             next_token_logits[:, mask] = next_token_logits[:, mask] - float('Inf')
-            next_token_logits[:, 0:2] = next_token_logits[:, 0:2] - float('Inf')
+            next_token_logits[:, 0] = next_token_logits[:, 0] - float('Inf')
             sorted_logits, sorted_index = torch.sort(F.softmax(next_token_logits, dim=-1), dim=-1, descending=True)
             sorted_token = sorted_index.flatten()[torch.argsort(sorted_logits.flatten(), descending=True)]
             sequences = torch.cat((sequences, sorted_token[0:b].unsqueeze(-1)), dim=-1)
@@ -340,7 +339,7 @@ def cs_normalization(args, dico, lang, type, b=10):
     # 4) WER, normalization.
     f = open(args.model + '_' + lang + type + '_cs_norm.txt', 'w', encoding='utf-8')
     s = open(args.model + '_' + lang + type + '_cs_orig.txt', 'w', encoding='utf-8')
-    model = old_model(args, args.vocab_size, 70)
+    model = LMModel(args, args.vocab_size)
     model.load_state_dict(torch.load(args.model + '.pt'))
     model.to(device)
     model.eval()
@@ -348,10 +347,13 @@ def cs_normalization(args, dico, lang, type, b=10):
     en_mask, zh_mask = getLangMask(dico)
     if lang == 'en':
         mask = zh_mask
+        test_iterator = get_iterator('cs', 'test_cs_en_norm')
+        epoch_size = len(data['cs']['test_cs_en_norm'])
     else:
         mask = en_mask
-    test_iterator = get_iterator('cs', 'test_cs')
-    epoch_size = len(data['cs']['test_cs'])
+        test_iterator = get_iterator('cs', 'test_cs_zh_norm')
+        epoch_size = len(data['cs']['test_cs_zh_norm'])
+
     for x, lengths in tqdm(test_iterator, total=epoch_size):
         x = x.to(device)
         if type == 'auto':
@@ -507,15 +509,15 @@ def evaluator(args, dico):
 
 
 if __name__ == '__main__':
-    model_paths = ['/home/grandee/projects/LM/save/mix_multi_words_target_train_adapt']
+    model_paths = ['/home/grandee/projects/LM/save/xlm_baseline_mix_attn_no_schedule_train']
 
     for path in model_paths:
         args.model = path
         logger = create_logger(args.model + '_eval.log')
         # ============== data set preparation ======================
-        args.batch_size = 50
+        args.batch_size = 1
         args.n_ctx = 70
-        args.max_len = 68
+        args.max_len = 34
         check_data_params(args)
 
         # load data
@@ -530,8 +532,9 @@ if __name__ == '__main__':
             logger.info('{} : {}'.format(key, value))
         logger.info('------------------------------------------------')
 
-        evaluator(args, dico)
-        # cs_normalization(args, dico, 'en', 'auto', b=20)
-        # cs_normalization(args, dico, 'zh', 'auto', b=20)
-        # cs_normalization(args, dico, 'en', 'seq2seq', b=20)
-        # cs_normalization(args, dico, 'zh', 'seq2seq', b=20)
+        # evaluator(args, dico)
+        cs_normalization(args, dico, 'en', 'auto', b=20)
+        cs_normalization(args, dico, 'en', 'seq2seq', b=20)
+        cs_normalization(args, dico, 'zh', 'auto', b=20)
+        cs_normalization(args, dico, 'zh', 'seq2seq', b=20)
+
