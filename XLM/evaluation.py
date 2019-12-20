@@ -300,19 +300,20 @@ def beam_search_norm_auto(model, x, mask, b=10):
     with torch.no_grad():
         assert x.size(0) == 1, 'input sent by sent'
         predict_marker = mask[x[0]]
-        sequences = torch.tensor([], dtype=torch.long, device=device)
+        # sequences = torch.tensor([], dtype=torch.long, device=device)
+        sequences = x[:, :]
         for i, marker in enumerate(predict_marker):
             if marker:
-                outputs = model(x[:, :i+1])
+                outputs = model(x[:, :i + 1])
                 next_token_logits = outputs[:, -1, :]
                 next_token_logits[:, mask] = next_token_logits[:, mask] - float('Inf')
-                next_token_logits[:, 0:2] = next_token_logits[:, 0:2] - float('Inf')
+                next_token_logits[:, 0:4] = next_token_logits[:, 0:4] - float('Inf')
                 # sorted_logits, sorted_index = torch.sort(F.softmax(next_token_logits, dim=-1), dim=-1, descending=True)
                 # sorted_token = sorted_index.flatten()[torch.argsort(sorted_logits.flatten(), descending=True)]
                 sorted_token = torch.argmax(F.softmax(next_token_logits, dim=-1), dim=-1)
                 sequences = torch.cat((sequences, sorted_token.unsqueeze(-1)), dim=-1)
             else:
-                sequences = torch.cat((sequences, x[:, i]), dim=1)
+                sequences = torch.cat((sequences, x[:, i].unsqueeze(-1)), dim=1)
 
     return sequences[0, :]
 
@@ -320,16 +321,21 @@ def beam_search_norm_auto(model, x, mask, b=10):
 def beam_search_norm_seq2seq(model, x, mask, b=10):
     with torch.no_grad():
         assert x.size(0) == 1, 'input sent by sent'
-        sequences = torch.cat((x[0, :].repeat(b, 1),
-                               torch.empty((b, 1), dtype=torch.long).fill_(0).to(device)), dim=-1)
-        for _ in range(33):
-            outputs = model(sequences)
-            next_token_logits = outputs[:, -1, :]
-            next_token_logits[:, mask] = next_token_logits[:, mask] - float('Inf')
-            next_token_logits[:, 0] = next_token_logits[:, 0] - float('Inf')
-            sorted_logits, sorted_index = torch.sort(F.softmax(next_token_logits, dim=-1), dim=-1, descending=True)
-            sorted_token = sorted_index.flatten()[torch.argsort(sorted_logits.flatten(), descending=True)]
-            sequences = torch.cat((sequences, sorted_token[0:b].unsqueeze(-1)), dim=-1)
+        predict_marker = mask[x[0]]
+        # sequences = torch.cat((x[0, :].repeat(b, 1),
+        #                        torch.empty((b, 1), dtype=torch.long).fill_(0).to(device)), dim=-1)
+        sequences = x[:, :].repeat(b, 1)
+        for i, marker in enumerate(predict_marker):
+            if marker:
+                outputs = model(sequences)
+                next_token_logits = outputs[:, -1, :]
+                next_token_logits[:, mask] = next_token_logits[:, mask] - float('Inf')
+                next_token_logits[:, 0:4] = next_token_logits[:, 0:4] - float('Inf')
+                sorted_logits, sorted_index = torch.sort(F.softmax(next_token_logits, dim=-1), dim=-1, descending=True)
+                sorted_token = sorted_index.flatten()[torch.argsort(sorted_logits.flatten(), descending=True)]
+                sequences = torch.cat((sequences, sorted_token[0:b].unsqueeze(-1)), dim=-1)
+            else:
+                sequences = torch.cat((sequences, x[:, i].unsqueeze(-1).repeat(b, 1)), dim=1)
 
     return sequences[0, x.size(-1):]
 
@@ -339,7 +345,7 @@ def cs_normalization(args, dico, lang, type, b=10):
     # 4) WER, normalization.
     f = open(args.model + '_' + lang + type + '_cs_norm.txt', 'w', encoding='utf-8')
     s = open(args.model + '_' + lang + type + '_cs_orig.txt', 'w', encoding='utf-8')
-    model = LMModel(args, args.vocab_size)
+    model = old_model(args, args.vocab_size, 70)
     model.load_state_dict(torch.load(args.model + '.pt'))
     model.to(device)
     model.eval()
@@ -385,7 +391,7 @@ def write(words, m, file):
 
 
 def evaluator(args, dico):
-    model = LMModel(args, args.vocab_size)
+    model = old_model(args, args.vocab_size, 70)
     criterion = nn.CrossEntropyLoss(reduction='none')
 
     logger.info("Model: {}".format(model))
@@ -396,102 +402,102 @@ def evaluator(args, dico):
 
     # ==================== PPL using 50k vocab ========================================
     # this is the valid
-    test_iterator = get_iterator('cs', 'valid')
-    test_loss = evaluate(model, criterion, test_iterator)
-    logger.debug('test_loss: {}'.format(test_loss))
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-    # this is the overall test
-    test_iterator = get_iterator('cs', 'test')
-    test_loss = evaluate(model, criterion, test_iterator)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-    # Run on test data.
-    test_iterator = get_iterator('cs', 'test_cs')
-    test_loss = evaluate(model, criterion, test_iterator)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-    # Run on test data.
-    test_iterator = get_iterator('cs', 'test_en')
-    test_loss = evaluate(model, criterion, test_iterator)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-    # Run on test data.
-    test_iterator = get_iterator('cs', 'test_zh')
-    test_loss = evaluate(model, criterion, test_iterator)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
+    # test_iterator = get_iterator('cs', 'valid')
+    # test_loss = evaluate(model, criterion, test_iterator)
+    # logger.debug('test_loss: {}'.format(test_loss))
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    # # this is the overall test
+    # test_iterator = get_iterator('cs', 'test')
+    # test_loss = evaluate(model, criterion, test_iterator)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    # # Run on test data.
+    # test_iterator = get_iterator('cs', 'test_cs')
+    # test_loss = evaluate(model, criterion, test_iterator)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    # # Run on test data.
+    # test_iterator = get_iterator('cs', 'test_en')
+    # test_loss = evaluate(model, criterion, test_iterator)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    # # Run on test data.
+    # test_iterator = get_iterator('cs', 'test_zh')
+    # test_loss = evaluate(model, criterion, test_iterator)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
 
     # ==================== PPL using benchmark vocab ========================================
     # here use the mask and get ppl to compare with benchmark
-    if not os.path.exists(args.model + '_mask'):
-        mask = getMask('/home/grandee/projects/LM/data/cs/seame.full_vocab', args)
-    else:
-        logger.info('loading mask from {}'.format(args.model + '_mask'))
-        mask = torch.load(args.model + "_mask")
-    logger.info('the new vocab is {}, {} no of vocab masked'.format(args.vocab_size - sum(mask), sum(mask)))
-    # this is the valid
-    test_iterator = get_iterator('cs', 'valid')
-    test_loss = evaluate(model, criterion, test_iterator, mask)
-    logger.debug('test_loss: {}'.format(test_loss))
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-    # this is the overall test
-    test_iterator = get_iterator('cs', 'test')
-    test_loss = evaluate(model, criterion, test_iterator, mask)
-    logger.debug('test_loss: {}'.format(test_loss))
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-    # Run on test data.
-    test_iterator = get_iterator('cs', 'test_cs')
-    test_loss = evaluate(model, criterion, test_iterator, mask)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-    # Run on test data.
-    test_iterator = get_iterator('cs', 'test_en')
-    test_loss = evaluate(model, criterion, test_iterator, mask)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-    # Run on test data.
-    test_iterator = get_iterator('cs', 'test_zh')
-    test_loss = evaluate(model, criterion, test_iterator, mask)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
-
-    # ==================== token level PPL ========================================
-    # token level ppl
-    cs_mask, _ = getCSMask(dico)
-    test_iterator = get_iterator('cs', 'test_cs')
-    test_loss = token_ppl(model, criterion, test_iterator, cs_mask)
-    logger.debug('=' * 89)
-    logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
-        test_loss, math.exp(test_loss)))
-    logger.debug('=' * 89)
+    # if not os.path.exists(args.model + '_mask'):
+    #     mask = getMask('/home/grandee/projects/LM/data/cs/seame.full_vocab', args)
+    # else:
+    #     logger.info('loading mask from {}'.format(args.model + '_mask'))
+    #     mask = torch.load(args.model + "_mask")
+    # logger.info('the new vocab is {}, {} no of vocab masked'.format(args.vocab_size - sum(mask), sum(mask)))
+    # # this is the valid
+    # test_iterator = get_iterator('cs', 'valid')
+    # test_loss = evaluate(model, criterion, test_iterator, mask)
+    # logger.debug('test_loss: {}'.format(test_loss))
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    # # this is the overall test
+    # test_iterator = get_iterator('cs', 'test')
+    # test_loss = evaluate(model, criterion, test_iterator, mask)
+    # logger.debug('test_loss: {}'.format(test_loss))
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    # # Run on test data.
+    # test_iterator = get_iterator('cs', 'test_cs')
+    # test_loss = evaluate(model, criterion, test_iterator, mask)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test_cs loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    # # Run on test data.
+    # test_iterator = get_iterator('cs', 'test_en')
+    # test_loss = evaluate(model, criterion, test_iterator, mask)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test_en loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    # # Run on test data.
+    # test_iterator = get_iterator('cs', 'test_zh')
+    # test_loss = evaluate(model, criterion, test_iterator, mask)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test_zh loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
+    #
+    # # ==================== token level PPL ========================================
+    # # token level ppl
+    # cs_mask, _ = getCSMask(dico)
+    # test_iterator = get_iterator('cs', 'test_cs')
+    # test_loss = token_ppl(model, criterion, test_iterator, cs_mask)
+    # logger.debug('=' * 89)
+    # logger.debug('| End of training | test loss {:5.2f} | test ppl {:8.2f} |'.format(
+    #     test_loss, math.exp(test_loss)))
+    # logger.debug('=' * 89)
 
     # ================= Generator ====================================
     cs_mask = getCSMask(dico)
     for temp in [0.7, 1]:  # , 10, 100]:
-        for _ in range(10):
+        for _ in range(100):
             generated = sample_sequence(args, model, dico, args.n_ctx, temperature=temp, mask=cs_mask)
             generated = generated.cpu().numpy()
             generated_word = []
@@ -502,14 +508,14 @@ def evaluator(args, dico):
             logger.debug(' '.join(generated_word))
 
     # # ================== BLI ========================================
-    matrix = model.transformer.embed.weight.data.cpu().numpy()
-    if not os.path.exists(args.model + '_embed'):
-        write(data['dictionary'].id2word.values(), matrix, args.model + '_embed')
-    logger.info('Embed saved to {}'.format(args.model + '_embed'))
+    # matrix = model.transformer.embed.weight.data.cpu().numpy()
+    # if not os.path.exists(args.model + '_embed'):
+    #     write(data['dictionary'].id2word.values(), matrix, args.model + '_embed')
+    # logger.info('Embed saved to {}'.format(args.model + '_embed'))
 
 
 if __name__ == '__main__':
-    model_paths = ['/home/grandee/projects/LM/save/xlm_baseline_mix_attn_no_schedule_train']
+    model_paths = ['/home/grandee/projects/LM/save/xlm_baseline_mix_adapt']
 
     for path in model_paths:
         args.model = path
@@ -532,9 +538,8 @@ if __name__ == '__main__':
             logger.info('{} : {}'.format(key, value))
         logger.info('------------------------------------------------')
 
-        # evaluator(args, dico)
-        cs_normalization(args, dico, 'en', 'auto', b=20)
-        cs_normalization(args, dico, 'en', 'seq2seq', b=20)
-        cs_normalization(args, dico, 'zh', 'auto', b=20)
-        cs_normalization(args, dico, 'zh', 'seq2seq', b=20)
-
+        evaluator(args, dico)
+        # cs_normalization(args, dico, 'en', 'auto', b=20)
+        # cs_normalization(args, dico, 'en', 'seq2seq', b=20)
+        # cs_normalization(args, dico, 'zh', 'auto', b=20)
+        # cs_normalization(args, dico, 'zh', 'seq2seq', b=20)
